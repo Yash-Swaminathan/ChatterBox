@@ -1,11 +1,7 @@
 .claude
 server/node_modules
-server/.env
 client/node_modules
-*.log
-.DS_Store
+node_modules/
+server/.env
+client/.env
 .env
-.env.example
-server/eslint.config.js
-server/.prettierrc
-server/.prettierignore
