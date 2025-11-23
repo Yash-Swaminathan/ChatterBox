@@ -3,12 +3,18 @@ const app = require('./app');
 
 const PORT = process.env.PORT || 3000;
 
+// TODO: Add Socket.io server initialization (Phase 2, Week 3)
+// const server = require('http').createServer(app);
+// const io = require('./socket')(server);
+
 // Start server
 const server = app.listen(PORT, () => {
-  console.log(' Server Started!');
-  console.log(`Environment: ${process.env.NODE_ENV}`);
-  console.log(`Server running on: http://localhost:${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
+  console.log('='.repeat(50));
+  console.log('🚀 ChatterBox Server Started!');
+  console.log(`📡 Environment: ${process.env.NODE_ENV}`);
+  console.log(`🌐 Server running on: http://localhost:${PORT}`);
+  console.log(`❤️  Health check: http://localhost:${PORT}/health`);
+  console.log('='.repeat(50));
 });
 
 // shutdown from process manager or hosting environment

@@ -4,20 +4,22 @@ const helmet = require('helmet');
 
 const app = express();
 
-
+// Security middleware
 app.use(helmet());
 
+// CORS - allows frontend to connect from different port
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3001',
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
     credentials: true,
   })
 );
 
+// Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
+// Health check endpoint - test if server is running
 app.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -27,7 +29,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes
+// TODO: Add API routes here (Phase 1, Week 1)
+// Example structure:
+// const authRoutes = require('./routes/auth.routes');
+// const userRoutes = require('./routes/user.routes');
+// app.use('/api/auth', authRoutes);
+// app.use('/api/users', userRoutes);
+
+// Temporary root API endpoint
 app.get('/api', (req, res) => {
   res.json({
     success: true,
