@@ -6,3 +6,6 @@ client/node_modules
 .DS_Store
 .env
 .env.example
+server/eslint.config.js
+server/.prettierrc
+server/.prettierignore
