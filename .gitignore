@@ -1,2 +1,8 @@
 .claude
 server/node_modules
+server/.env
+client/node_modules
+*.log
+.DS_Store
+.env
+.env.example
