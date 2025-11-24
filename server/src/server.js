@@ -21,6 +21,10 @@ const server = app.listen(PORT, () => {
 process.on('SIGTERM', () => {
   console.log('Shutting down');
   server.close(() => {
+    if (err) {
+      console.error('Error closing server:', err);
+      process.exit(1);
+    }
     console.log('Server closed');
     process.exit(0);
   });
@@ -30,6 +34,10 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('\nSIGINT received, shutting down gracefully...');
   server.close(() => {
+    if (err) {
+      console.error('Error closing server:', err);
+      process.exit(1);
+    }
     console.log('Server closed');
     process.exit(0);
   });
