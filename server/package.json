@@ -1,0 +1,41 @@
+{
+  "name": "chatterbox-server",
+  "version": "1.0.0",
+  "description": "ChatterBox - Real-time messaging platform backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest",
+    "lint": "eslint --config formatting/eslint.config.js src/**/*.js",
+    "lint:fix": "eslint --config formatting/eslint.config.js src/**/*.js --fix",
+    "format": "prettier --config formatting/.prettierrc --write \"src/**/*.js\"",
+    "format:check": "prettier --config formatting/.prettierrc --check \"src/**/*.js\""
+  },
+  "keywords": [
+    "chat",
+    "messaging",
+    "real-time",
+    "socket.io"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "redis": "^5.10.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.6.2"
+  }
+}
