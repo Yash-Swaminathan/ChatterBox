@@ -20,7 +20,7 @@ const server = app.listen(PORT, () => {
 // shutdown from process manager or hosting environment
 process.on('SIGTERM', () => {
   console.log('Shutting down');
-  server.close(() => {
+  server.close(err => {
     if (err) {
       console.error('Error closing server:', err);
       process.exit(1);
@@ -33,7 +33,7 @@ process.on('SIGTERM', () => {
 // force shutdown
 process.on('SIGINT', () => {
   console.log('\nSIGINT received, shutting down gracefully...');
-  server.close(() => {
+  server.close(err => {
     if (err) {
       console.error('Error closing server:', err);
       process.exit(1);
