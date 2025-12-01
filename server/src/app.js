@@ -1,13 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+// TODO: Uncomment after implementing database tests
+// const { testConnection: testPostgres } = require('./config/database');
+// const { testConnection: testRedis } = require('./config/redis');
 
 const app = express();
 
 // Security middleware
 app.use(helmet());
 
-// CORS - allows frontend to connect from different port
+// allows frontend to connect
 app.use(
   cors({
     origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -19,7 +22,7 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint - test if server is running
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
