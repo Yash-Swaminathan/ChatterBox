@@ -4,6 +4,8 @@ services:
     image: postgres:15-alpine
     container_name: chatterbox-postgres
     environment:
+      # TODO: For production, move these credentials to environment variables or a secrets manager
+      # and replace them with strong, unique passwords and usernames.
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password123
       POSTGRES_DB: chatterbox
@@ -25,6 +27,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: chatterbox-redis
+    # TODO: For production, configure Redis with a password and update REDIS_URL accordingly.
     ports:
       - "6379:6379"
     volumes:

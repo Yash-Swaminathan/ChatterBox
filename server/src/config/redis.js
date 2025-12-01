@@ -2,6 +2,7 @@ const redis = require('redis');
 require('dotenv').config();
 
 // Redis client configuration
+// TODO: In production, set REDIS_URL to use authentication and TLS (for example: redis://:password@host:6379).
 const redisClient = redis.createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
