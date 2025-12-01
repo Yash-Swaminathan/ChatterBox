@@ -9,12 +9,10 @@ const PORT = process.env.PORT || 3000;
 
 // Start server
 const server = app.listen(PORT, () => {
-  console.log('='.repeat(50));
-  console.log('🚀 ChatterBox Server Started!');
-  console.log(`📡 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🌐 Server running on: http://localhost:${PORT}`);
-  console.log(`❤️  Health check: http://localhost:${PORT}/health`);
-  console.log('='.repeat(50));
+  console.log('Server Started!');
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`Server running on: http://localhost:${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
 });
 
 // shutdown from process manager or hosting environment
