@@ -9,8 +9,8 @@ const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD,
   max: 20, // 20 clients in the pool
-  idleTimeout: 30000, // 30 seconds
-  connectionTimeout: 2000, // 2 seconds
+  idleTimeoutMillis: 30000, // 30 seconds
+  connectionTimeoutMillis: 2000, // 2 seconds
 });
 
 // Handle pool errors

@@ -141,7 +141,13 @@ const showStatus = async () => {
   try {
     console.log('Migration Status');
 
-    await testConnection();
+    // Test connection first
+    const connected = await testConnection();
+    if (!connected) {
+      console.error('Database connection failed');
+      process.exit(1);
+    }
+
     await createMigrationsTable();
 
     const executedMigrations = await getExecutedMigrations();
