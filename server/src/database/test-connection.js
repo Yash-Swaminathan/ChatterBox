@@ -2,9 +2,7 @@ const { testConnection: testPostgres, closePool } = require('../config/database'
 const { connectRedis, testConnection: testRedis, closeRedis } = require('../config/redis');
 
 async function testConnections() {
-
   let allSuccess = true;
-
 
   const pgSuccess = await testPostgres();
   if (!pgSuccess) {

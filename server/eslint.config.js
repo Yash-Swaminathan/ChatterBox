@@ -1,8 +1,6 @@
 // Command to fix eslint errors: npm run lint:fix
-// Command to format code: npm run format
-// Command to check formatting: npm run format:check
-// Command for prettier: npm run prettier
-// npm run format
+// Command to format code prettier: npm run format
+
 
 const globals = require('globals');
 
@@ -51,4 +49,3 @@ module.exports = [
     ignores: ['node_modules/', 'dist/', 'build/'],
   },
 ];
-

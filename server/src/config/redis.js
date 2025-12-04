@@ -6,7 +6,7 @@ require('dotenv').config();
 const redisClient = redis.createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
-    reconnectStrategy: (retries) => {
+    reconnectStrategy: retries => {
       if (retries > 10) {
         console.error('Redis: Too many reconnection attempts, giving up');
         return new Error('Too many retries');
@@ -28,7 +28,7 @@ redisClient.on('ready', () => {
   console.log('Redis: Connected and ready');
 });
 
-redisClient.on('error', (err) => {
+redisClient.on('error', err => {
   console.error('Redis error:', err.message);
 });
 
@@ -94,7 +94,7 @@ const set = async (key, value, expirationSeconds = null) => {
 };
 
 // Get a key and parse JSON if applicable
-const get = async (key) => {
+const get = async key => {
   try {
     const value = await redisClient.get(key);
     if (!value) return null;
@@ -111,7 +111,7 @@ const get = async (key) => {
 };
 
 // Delete a key
-const del = async (key) => {
+const del = async key => {
   try {
     await redisClient.del(key);
     return true;
@@ -122,7 +122,7 @@ const del = async (key) => {
 };
 
 // Check if key exists
-const exists = async (key) => {
+const exists = async key => {
   try {
     const result = await redisClient.exists(key);
     return result === 1;

@@ -43,9 +43,8 @@ function requireAuth(req, res, next) {
   } catch (error) {
     // Differentiate between expired and invalid tokens
     const code = error.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN';
-    const message = error.name === 'TokenExpiredError'
-      ? 'Token has expired'
-      : error.message || 'Invalid token';
+    const message =
+      error.name === 'TokenExpiredError' ? 'Token has expired' : error.message || 'Invalid token';
 
     return res.status(401).json({
       success: false,

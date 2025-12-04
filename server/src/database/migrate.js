@@ -30,7 +30,7 @@ const getExecutedMigrations = async () => {
     const result = await pool.query(
       'SELECT migration_name FROM schema_migrations ORDER BY migration_name'
     );
-    return result.rows.map((row) => row.migration_name);
+    return result.rows.map(row => row.migration_name);
   } catch (err) {
     console.error('Error fetching executed migrations:', err.message);
     throw err;
@@ -41,9 +41,7 @@ const getExecutedMigrations = async () => {
 const getMigrationFiles = async () => {
   try {
     const files = await fs.readdir(MIGRATIONS_DIR);
-    return files
-      .filter((file) => file.endsWith('.sql'))
-      .sort(); // Sort alphabetically (001, 002, etc.)
+    return files.filter(file => file.endsWith('.sql')).sort(); // Sort alphabetically (001, 002, etc.)
   } catch (err) {
     console.error('Error reading migrations directory:', err.message);
     throw err;
@@ -51,7 +49,7 @@ const getMigrationFiles = async () => {
 };
 
 // Execute a single migration
-const executeMigration = async (filename) => {
+const executeMigration = async filename => {
   const filePath = path.join(MIGRATIONS_DIR, filename);
 
   try {
@@ -69,10 +67,7 @@ const executeMigration = async (filename) => {
       await client.query(sql);
 
       // Record migration as executed
-      await client.query(
-        'INSERT INTO schema_migrations (migration_name) VALUES ($1)',
-        [filename]
-      );
+      await client.query('INSERT INTO schema_migrations (migration_name) VALUES ($1)', [filename]);
 
       await client.query('COMMIT');
       console.log(`Migration ${filename} completed successfully`);
@@ -110,9 +105,7 @@ const runMigrations = async () => {
     console.log(`Already executed: ${executedMigrations.length}`);
 
     // Find pending migrations
-    const pendingMigrations = migrationFiles.filter(
-      (file) => !executedMigrations.includes(file)
-    );
+    const pendingMigrations = migrationFiles.filter(file => !executedMigrations.includes(file));
 
     if (pendingMigrations.length === 0) {
       console.log('No pending migrations. Database is up to date!');
@@ -157,17 +150,15 @@ const showStatus = async () => {
     if (executedMigrations.length === 0) {
       console.log('No executed migrations');
     } else {
-      executedMigrations.forEach((m) => console.log(m));
+      executedMigrations.forEach(m => console.log(m));
     }
 
     console.log('Pending migrations:');
-    const pendingMigrations = migrationFiles.filter(
-      (file) => !executedMigrations.includes(file)
-    );
+    const pendingMigrations = migrationFiles.filter(file => !executedMigrations.includes(file));
     if (pendingMigrations.length === 0) {
       console.log('No pending migrations');
     } else {
-      pendingMigrations.forEach((m) => console.log(m));
+      pendingMigrations.forEach(m => console.log(m));
     }
   } catch (err) {
     console.error('Error:', err.message);

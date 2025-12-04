@@ -14,7 +14,7 @@ const pool = new Pool({
 });
 
 // Handle pool errors
-pool.on('error', (err, client) => {
+pool.on('error', (err, _client) => {
   console.error('Unexpected error on idle client', err);
   process.exit(-1);
 });
@@ -51,7 +51,6 @@ const query = async (text, params) => {
 const getClient = async () => {
   return await pool.connect();
 };
-
 
 const closePool = async () => {
   try {
