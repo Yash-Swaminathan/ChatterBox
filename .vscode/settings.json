@@ -1,0 +1,16 @@
+{
+  "eslint.enable": true,
+  "eslint.workingDirectories": [
+    "server"
+  ],
+  "eslint.validate": [
+    "javascript"
+  ],
+  "[javascript]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  }
+}
+
