@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
  * @returns {Promise<string>} Hashed password
  */
 async function hashPassword(password) {
-  const saltRounds = 12; // Higher = more secure but slower
+  const saltRounds = 12; // Higher = more secure but slower to hash Randomly generated
   return await bcrypt.hash(password, saltRounds);
 }
 
