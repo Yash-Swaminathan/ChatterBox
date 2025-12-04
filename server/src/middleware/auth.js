@@ -17,7 +17,7 @@ function requireAuth(req, res, next) {
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer')) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
         error: {
@@ -27,8 +27,8 @@ function requireAuth(req, res, next) {
       });
     }
 
-    // Extract token
-    const token = authHeader.substring(7);
+    // Extract token (split by space and take second part)
+    const token = authHeader.split(' ')[1];
 
     // Verify token
     const decoded = verifyAccessToken(token);
@@ -41,11 +41,17 @@ function requireAuth(req, res, next) {
 
     next();
   } catch (error) {
+    // Differentiate between expired and invalid tokens
+    const code = error.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN';
+    const message = error.name === 'TokenExpiredError'
+      ? 'Token has expired'
+      : error.message || 'Invalid token';
+
     return res.status(401).json({
       success: false,
       error: {
-        code: 'INVALID_TOKEN',
-        message: error.message || 'Invalid or expired token',
+        code,
+        message,
       },
     });
   }
