@@ -20,10 +20,10 @@ function validateRegistration(req, res, next) {
     errors.push('Username can only contain letters, numbers, and underscores');
   }
 
-  // Email validation
+  // Email validation (more robust regex to prevent issues like double dots)
   if (!email || email.trim().length === 0) {
     errors.push('Email is required');
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
     errors.push('Invalid email format');
   }
 
