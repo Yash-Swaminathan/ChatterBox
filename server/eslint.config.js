@@ -1,3 +1,7 @@
+// Command to fix eslint errors: npm run lint:fix
+// Command to format code prettier: npm run format
+
+
 const globals = require('globals');
 
 module.exports = [
@@ -29,6 +33,16 @@ module.exports = [
 
       // Node.js specific
       'no-process-exit': 'off', // Allow process.exit()
+    },
+  },
+  {
+    files: ['**/*.spec.js', '**/*.test.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.es2021,
+        ...globals.jest,
+      },
     },
   },
   {

@@ -244,7 +244,7 @@ describe('Validation Middleware', () => {
         'user123@test-domain.com',
       ];
 
-      validEmails.forEach((email) => {
+      validEmails.forEach(email => {
         req.body = {
           username: 'validuser',
           email: email,
