@@ -1,7 +1,8 @@
 const { query, getClient } = require('../config/database');
 const { hashPassword, comparePassword } = require('../utils/bcrypt');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/jwt');
-
+const validator = require('validator');
+const logger = require('../utils/logger');
 
 // Register a new user
 // POST /api/auth/register
@@ -9,7 +10,12 @@ async function register(req, res) {
   const client = await getClient();
 
   try {
-    const { username, email, password, displayName, phoneNumber } = req.body;
+    // Sanitize and normalize inputs
+    const username = validator.trim(req.body.username || '');
+    const email = validator.normalizeEmail(req.body.email || '') || validator.trim(req.body.email || '');
+    const password = req.body.password || ''; // Don't trim passwords
+    const displayName = req.body.displayName ? validator.trim(req.body.displayName) : username;
+    const phoneNumber = req.body.phoneNumber ? validator.trim(req.body.phoneNumber) : null;
 
     // Start transaction
     await client.query('BEGIN');
@@ -98,7 +104,10 @@ async function register(req, res) {
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Registration error:', error);
+    logger.error('Registration failed', {
+      errorCode: error.code,
+      errorMessage: error.message,
+    });
     return res.status(500).json({
       success: false,
       error: {
@@ -117,7 +126,9 @@ async function login(req, res) {
   const client = await getClient();
 
   try {
-    const { email, password } = req.body;
+    // Sanitize inputs
+    const email = validator.normalizeEmail(req.body.email || '') || validator.trim(req.body.email || '');
+    const password = req.body.password || ''; // Don't trim passwords
 
     await client.query('BEGIN');
 
@@ -221,7 +232,10 @@ async function login(req, res) {
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Login error:', error);
+    logger.error('Login failed', {
+      errorCode: error.code,
+      errorMessage: error.message,
+    });
     return res.status(500).json({
       success: false,
       error: {
@@ -285,7 +299,11 @@ async function logout(req, res) {
       },
     });
   } catch (error) {
-    console.error('Logout error:', error);
+    logger.error('Logout failed', {
+      errorCode: error.code,
+      errorMessage: error.message,
+      userId: req.user?.userId,
+    });
     return res.status(500).json({
       success: false,
       error: {
@@ -408,7 +426,10 @@ async function refreshTokenHandler(req, res) {
       },
     });
   } catch (error) {
-    console.error('Token refresh error:', error);
+    logger.error('Token refresh failed', {
+      errorCode: error.code,
+      errorMessage: error.message,
+    });
     return res.status(500).json({
       success: false,
       error: {
@@ -464,7 +485,11 @@ async function getCurrentUser(req, res) {
       },
     });
   } catch (error) {
-    console.error('Get current user error:', error);
+    logger.error('Get current user failed', {
+      errorCode: error.code,
+      errorMessage: error.message,
+      userId: req.user?.userId,
+    });
     return res.status(500).json({
       success: false,
       error: {
