@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET;
@@ -29,7 +30,12 @@ function generateAccessToken(payload) {
  * @returns {string} JWT refresh token
  */
 function generateRefreshToken(payload) {
-  return jwt.sign(payload, REFRESH_TOKEN_SECRET, {
+  // Add unique jti (JWT ID) to prevent duplicate tokens
+  const payloadWithJti = {
+    ...payload,
+    jti: crypto.randomBytes(16).toString('hex'),
+  };
+  return jwt.sign(payloadWithJti, REFRESH_TOKEN_SECRET, {
     expiresIn: REFRESH_TOKEN_EXPIRY,
   });
 }
