@@ -32,12 +32,15 @@ app.get('/health', (req, res) => {
   });
 });
 
-// TODO: Add API routes here (Phase 1, Week 1)
-// Example structure:
-// const authRoutes = require('./routes/auth.routes');
-// const userRoutes = require('./routes/user.routes');
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
+// API routes
+const authRoutes = require('./routes/auth.routes');
+app.use('/api/auth', authRoutes);
+
+// TODO: Add more routes as we build them
+// const userRoutes = require('./routes/user.routes');  (Week 2)
+// const contactRoutes = require('./routes/contact.routes');  (Week 7)
+// const conversationRoutes = require('./routes/conversation.routes');  (Week 3)
+// const messageRoutes = require('./routes/message.routes');  (Week 4)
 
 // Temporary root API endpoint
 app.get('/api', (req, res) => {
