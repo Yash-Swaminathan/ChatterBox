@@ -41,15 +41,12 @@ async function getCurrentUser(req, res) {
       });
     }
 
-    // Remove password_hash from response (even though it's not selected in the model)
-    const { password_hash, ...userWithoutPassword } = user;
-
     logger.info('User profile retrieved successfully', { userId });
 
     return res.status(200).json({
       success: true,
       data: {
-        user: userWithoutPassword,
+        user,
       },
     });
   } catch (error) {
@@ -128,9 +125,6 @@ async function updateCurrentUser(req, res) {
       });
     }
 
-    // Remove password_hash from response (even though it's not selected in the model)
-    const { password_hash, ...userWithoutPassword } = updatedUser;
-
     logger.info('User profile updated successfully', {
       userId,
       updatedFields: Object.keys(updates),
@@ -139,7 +133,7 @@ async function updateCurrentUser(req, res) {
     return res.status(200).json({
       success: true,
       data: {
-        user: userWithoutPassword,
+        user: updatedUser,
       },
       message: 'Profile updated successfully',
     });
