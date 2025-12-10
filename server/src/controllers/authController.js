@@ -12,7 +12,8 @@ async function register(req, res) {
   try {
     // Sanitize and normalize inputs
     const username = validator.trim(req.body.username || '');
-    const email = validator.normalizeEmail(req.body.email || '') || validator.trim(req.body.email || '');
+    const email =
+      validator.normalizeEmail(req.body.email || '') || validator.trim(req.body.email || '');
     const password = req.body.password || ''; // Don't trim passwords
     const displayName = req.body.displayName ? validator.trim(req.body.displayName) : username;
     const phoneNumber = req.body.phoneNumber ? validator.trim(req.body.phoneNumber) : null;
@@ -127,7 +128,8 @@ async function login(req, res) {
 
   try {
     // Sanitize inputs
-    const email = validator.normalizeEmail(req.body.email || '') || validator.trim(req.body.email || '');
+    const email =
+      validator.normalizeEmail(req.body.email || '') || validator.trim(req.body.email || '');
     const password = req.body.password || ''; // Don't trim passwords
 
     await client.query('BEGIN');

@@ -24,9 +24,10 @@ let userId;
 // Clean up function to delete test users
 async function cleanupTestUsers() {
   try {
-    await query('DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)', [
-      'test%@example.com',
-    ]);
+    await query(
+      'DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
+      ['test%@example.com']
+    );
     await query('DELETE FROM users WHERE email LIKE $1', ['test%@example.com']);
   } catch (error) {
     console.error('Error cleaning up test users:', error);
@@ -77,7 +78,10 @@ describe('Authentication API', () => {
         password: 'TestPass123',
       };
 
-      const response = await request(app).post('/api/auth/register').send(duplicateUser).expect(400);
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send(duplicateUser)
+        .expect(400);
 
       expect(response.body).toMatchObject({
         success: false,
@@ -95,7 +99,10 @@ describe('Authentication API', () => {
         password: 'TestPass123',
       };
 
-      const response = await request(app).post('/api/auth/register').send(duplicateUser).expect(400);
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send(duplicateUser)
+        .expect(400);
 
       expect(response.body).toMatchObject({
         success: false,
@@ -436,10 +443,12 @@ describe('Authentication API', () => {
       expect(registerResponse.body.data.user).not.toHaveProperty('password_hash');
 
       // Login
-      const loginResponse = await request(app).post('/api/auth/login').send({
-        email: `security${uniqueId}@example.com`,
-        password: 'TestPass123',
-      });
+      const loginResponse = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: `security${uniqueId}@example.com`,
+          password: 'TestPass123',
+        });
 
       expect(loginResponse.body.data.user).not.toHaveProperty('password_hash');
 
@@ -453,10 +462,9 @@ describe('Authentication API', () => {
 
     test('should hash passwords differently for same password', async () => {
       // Get the password hash from database
-      const result = await query(
-        'SELECT password_hash FROM users WHERE email = $1',
-        [testUser.email]
-      );
+      const result = await query('SELECT password_hash FROM users WHERE email = $1', [
+        testUser.email,
+      ]);
       const hash1 = result.rows[0].password_hash;
 
       // Register another user with same password
@@ -466,10 +474,9 @@ describe('Authentication API', () => {
         password: testUser.password,
       });
 
-      const result2 = await query(
-        'SELECT password_hash FROM users WHERE email = $1',
-        ['samepass@example.com']
-      );
+      const result2 = await query('SELECT password_hash FROM users WHERE email = $1', [
+        'samepass@example.com',
+      ]);
       const hash2 = result2.rows[0].password_hash;
 
       // Hashes should be different (bcrypt generates unique salt)
@@ -487,10 +494,7 @@ describe('Authentication API', () => {
       const { refreshToken: token } = loginResponse.body.data;
 
       // Check session exists in database
-      const sessionResult = await query(
-        'SELECT * FROM sessions WHERE refresh_token = $1',
-        [token]
-      );
+      const sessionResult = await query('SELECT * FROM sessions WHERE refresh_token = $1', [token]);
 
       expect(sessionResult.rows.length).toBe(1);
       expect(sessionResult.rows[0].is_active).toBe(true);
@@ -511,10 +515,9 @@ describe('Authentication API', () => {
         .send({ refreshToken: rToken });
 
       // Check session is inactive
-      const sessionResult = await query(
-        'SELECT * FROM sessions WHERE refresh_token = $1',
-        [rToken]
-      );
+      const sessionResult = await query('SELECT * FROM sessions WHERE refresh_token = $1', [
+        rToken,
+      ]);
 
       expect(sessionResult.rows[0].is_active).toBe(false);
     });
@@ -530,10 +533,9 @@ describe('Authentication API', () => {
       expect(response.body.data.user.status).toBe('online');
 
       // Verify in database
-      const userResult = await query(
-        'SELECT status FROM users WHERE email = $1',
-        [testUser2.email]
-      );
+      const userResult = await query('SELECT status FROM users WHERE email = $1', [
+        testUser2.email,
+      ]);
       expect(userResult.rows[0].status).toBe('online');
     });
 
@@ -552,10 +554,9 @@ describe('Authentication API', () => {
         .send({ refreshToken: rToken });
 
       // Verify in database
-      const userResult = await query(
-        'SELECT status FROM users WHERE email = $1',
-        [testUser2.email]
-      );
+      const userResult = await query('SELECT status FROM users WHERE email = $1', [
+        testUser2.email,
+      ]);
       expect(userResult.rows[0].status).toBe('offline');
     });
   });
