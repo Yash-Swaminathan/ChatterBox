@@ -31,7 +31,7 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "leo-profanity": "^1.8.0",
+    "obscenity": "^0.4.5",
     "pg": "^8.16.3",
     "redis": "^5.10.0",
     "socket.io": "^4.8.1",
