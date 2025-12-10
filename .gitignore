@@ -5,3 +5,4 @@ server/.env
 client/.env
 .env
 .history/
+test-user-api.sh
