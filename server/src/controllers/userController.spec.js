@@ -14,6 +14,11 @@ jest.mock('../utils/logger', () => ({
   debug: jest.fn(),
 }));
 
+// Mock express-rate-limit to avoid rate limiting during tests
+jest.mock('express-rate-limit', () => {
+  return jest.fn(() => (_req, _res, next) => next());
+});
+
 describe('User Controller Tests', () => {
   // Sample user data
   const mockUser = {

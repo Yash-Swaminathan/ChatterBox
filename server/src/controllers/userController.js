@@ -1,3 +1,4 @@
+// Note: Validation middleware already ensures at least one field is provided
 const User = require('../models/User');
 const logger = require('../utils/logger');
 
@@ -95,21 +96,6 @@ async function updateCurrentUser(req, res) {
     if (display_name !== undefined) updates.display_name = display_name;
     if (bio !== undefined) updates.bio = bio;
     if (status !== undefined) updates.status = status;
-
-    // Check if any valid fields were provided
-    if (Object.keys(updates).length === 0) {
-      logger.info('No valid fields provided for update', { userId });
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'NO_UPDATE_FIELDS',
-          message: 'No valid fields provided for update',
-          details: {
-            allowedFields: ['display_name', 'bio', 'status'],
-          },
-        },
-      });
-    }
 
     // Update user profile
     const updatedUser = await User.updateUserProfile(userId, updates);
