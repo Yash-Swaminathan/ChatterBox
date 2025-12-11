@@ -43,8 +43,8 @@ const profileViewLimiter = rateLimit({
 });
 
 const avatarUploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // 10 uploads per hour
+  windowMs: parseInt(process.env.AVATAR_UPLOAD_WINDOW_MS || '3600000', 10), // 1 hour default
+  max: parseInt(process.env.AVATAR_UPLOAD_MAX_REQUESTS || '10', 10), // 10 uploads per hour default
   skip: () => isTest, // Skip rate limiting in tests
   message: {
     success: false,

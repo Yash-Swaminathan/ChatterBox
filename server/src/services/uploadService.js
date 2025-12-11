@@ -128,8 +128,17 @@ async function deleteAvatar(avatarUrl) {
  */
 function generateAvatarFilename(userId, originalname) {
   try {
+    // Validate inputs
+    if (!userId || !originalname) {
+      throw new Error('userId and originalname are required');
+    }
+
     // Extract file extension (lowercase)
-    const ext = originalname.toLowerCase().substring(originalname.lastIndexOf('.'));
+    // Handle files without extensions by defaulting to .jpg
+    const lastDotIndex = originalname.lastIndexOf('.');
+    const ext = lastDotIndex !== -1
+      ? originalname.toLowerCase().substring(lastDotIndex)
+      : '.jpg'; // Default extension for files without one
 
     // Generate unique ID
     const uniqueId = uuidv4();

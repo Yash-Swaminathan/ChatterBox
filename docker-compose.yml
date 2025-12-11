@@ -46,7 +46,13 @@ services:
     image: minio/minio:latest
     container_name: chatterbox-minio
     environment:
-      # TODO: For production, use strong credentials and configure via secrets
+      # TODO: PRODUCTION SECURITY - Update before deploying to production:
+      # 1. Replace hardcoded credentials with environment variables from .env
+      # 2. Use strong random credentials (generate with: openssl rand -base64 32)
+      # 3. Consider using Docker secrets or a secrets management service
+      # Example for production:
+      #   MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      #   MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
