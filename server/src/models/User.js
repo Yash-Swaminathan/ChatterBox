@@ -101,6 +101,7 @@ async function getPublicUserById(userId) {
  * @param {string} [updates.display_name] - Display name (1-100 chars)
  * @param {string} [updates.bio] - Bio (0-500 chars)
  * @param {string} [updates.status] - Status (online, offline, away, busy)
+ * @param {string} [updates.avatar_url] - Avatar URL (from MinIO/S3)
  * @returns {Promise<Object|null>} Updated user object or null if not found
  */
 async function updateUserProfile(userId, updates) {
@@ -112,7 +113,7 @@ async function updateUserProfile(userId, updates) {
     }
 
     // Build dynamic query based on provided fields
-    const allowedFields = ['display_name', 'bio', 'status'];
+    const allowedFields = ['display_name', 'bio', 'status', 'avatar_url'];
     const updateFields = [];
     const values = [];
     let paramIndex = 1;

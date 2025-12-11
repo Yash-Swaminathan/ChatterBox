@@ -4,6 +4,10 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const { requireAuth } = require('../middleware/auth');
 const { validateProfileUpdate, validateStatusUpdate } = require('../middleware/validation');
+const { uploadAvatar, handleUploadError, validateFileExists } = require('../middleware/upload');
+
+// Rate limiters for user endpoints (disabled in test environment)
+const isTest = process.env.NODE_ENV === 'test';
 
 /**
  * Rate limiters for user endpoints
@@ -11,6 +15,7 @@ const { validateProfileUpdate, validateStatusUpdate } = require('../middleware/v
 const profileUpdateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 updates per 15 minutes
+  skip: () => isTest, // Skip rate limiting in tests
   message: {
     success: false,
     error: {
@@ -25,11 +30,27 @@ const profileUpdateLimiter = rateLimit({
 const profileViewLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 30, // 30 requests per minute
+  skip: () => isTest, // Skip rate limiting in tests
   message: {
     success: false,
     error: {
       code: 'TOO_MANY_REQUESTS',
       message: 'Too many requests. Please try again later.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const avatarUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 uploads per hour
+  skip: () => isTest, // Skip rate limiting in tests
+  message: {
+    success: false,
+    error: {
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Too many avatar uploads. Please try again later.',
     },
   },
   standardHeaders: true,
@@ -73,6 +94,22 @@ router.put(
   profileUpdateLimiter,
   validateStatusUpdate,
   userController.updateStatus
+);
+
+/**
+ * @route   PUT /api/users/me/avatar
+ * @desc    Upload avatar for current authenticated user
+ * @access  Protected
+ * @body    multipart/form-data { avatar: <file> }
+ */
+router.put(
+  '/me/avatar',
+  requireAuth,
+  avatarUploadLimiter,
+  uploadAvatar,
+  handleUploadError,
+  validateFileExists,
+  userController.uploadAvatar
 );
 
 /**
