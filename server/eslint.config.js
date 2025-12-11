@@ -36,7 +36,7 @@ module.exports = [
     },
   },
   {
-    files: ['**/*.spec.js', '**/*.test.js'],
+    files: ['**/*.spec.js', '**/*.test.js', '**/__mocks__/**/*.js'],
     languageOptions: {
       globals: {
         ...globals.node,
