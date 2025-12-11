@@ -2,6 +2,7 @@
 const User = require('../models/User');
 const logger = require('../utils/logger');
 const { getPaginationParams, createPaginationResponse } = require('../utils/pagination');
+const { uploadAvatar: uploadAvatarToStorage, deleteAvatar } = require('../services/uploadService');
 
 /**
  * User Controller
@@ -404,10 +405,207 @@ async function updateStatus(req, res) {
   }
 }
 
+/**
+ * Upload avatar for current user
+ * @route PUT /api/users/me/avatar
+ * @access Protected
+ */
+async function uploadAvatar(req, res) {
+  try {
+    // User ID comes from auth middleware (req.user)
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      logger.warn('uploadAvatar called without userId in req.user');
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        },
+      });
+    }
+
+    // File validation is handled by Multer middleware
+    // At this point, req.file should exist and be validated
+    if (!req.file) {
+      logger.warn('uploadAvatar called without file', { userId });
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'NO_FILE_PROVIDED',
+          message: 'Please provide an avatar file',
+        },
+      });
+    }
+
+    // Get current user to check for existing avatar
+    const currentUser = await User.getUserById(userId);
+
+    if (!currentUser) {
+      logger.warn('User not found for avatar upload', { userId });
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'User not found',
+        },
+      });
+    }
+
+    const oldAvatarUrl = currentUser.avatar_url;
+
+    logger.info('Starting avatar upload process', {
+      userId,
+      filename: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      hasExistingAvatar: !!oldAvatarUrl,
+    });
+
+    // Upload new avatar to MinIO
+    let newAvatarUrl;
+    try {
+      newAvatarUrl = await uploadAvatarToStorage(
+        req.file.buffer,
+        userId,
+        req.file.mimetype,
+        req.file.originalname
+      );
+    } catch (uploadError) {
+      logger.error('Failed to upload avatar to storage', {
+        userId,
+        error: uploadError.message,
+        stack: uploadError.stack,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'UPLOAD_FAILED',
+          message: 'Failed to upload avatar. Please try again.',
+        },
+      });
+    }
+
+    // Update user's avatar_url in database
+    let updatedUser;
+    try {
+      updatedUser = await User.updateUserProfile(userId, {
+        avatar_url: newAvatarUrl,
+      });
+
+      if (!updatedUser) {
+        // Database update failed - need to cleanup uploaded file
+        logger.error('Database update failed after avatar upload', { userId, newAvatarUrl });
+
+        // Attempt to delete the uploaded file (cleanup)
+        try {
+          await deleteAvatar(newAvatarUrl);
+          logger.info('Cleaned up uploaded avatar after DB failure', { newAvatarUrl });
+        } catch (cleanupError) {
+          logger.error('Failed to cleanup avatar after DB failure', {
+            newAvatarUrl,
+            error: cleanupError.message,
+          });
+        }
+
+        return res.status(500).json({
+          success: false,
+          error: {
+            code: 'DATABASE_UPDATE_FAILED',
+            message: 'Failed to update user profile. Please try again.',
+          },
+        });
+      }
+    } catch (dbError) {
+      logger.error('Database error during avatar update', {
+        userId,
+        error: dbError.message,
+        stack: dbError.stack,
+      });
+
+      // Attempt to delete the uploaded file (cleanup)
+      try {
+        await deleteAvatar(newAvatarUrl);
+        logger.info('Cleaned up uploaded avatar after DB error', { newAvatarUrl });
+      } catch (cleanupError) {
+        logger.error('Failed to cleanup avatar after DB error', {
+          newAvatarUrl,
+          error: cleanupError.message,
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update user profile',
+        },
+      });
+    }
+
+    // Delete old avatar from storage (if exists)
+    // This is done after successful DB update to avoid orphaned files
+    // If deletion fails, we log it but don't fail the request
+    if (oldAvatarUrl) {
+      try {
+        const deleted = await deleteAvatar(oldAvatarUrl);
+        if (deleted) {
+          logger.info('Old avatar deleted successfully', { oldAvatarUrl });
+        } else {
+          logger.warn('Old avatar not found for deletion', { oldAvatarUrl });
+        }
+      } catch (deleteError) {
+        // Log error but don't fail the request
+        // The new avatar is already uploaded and DB is updated
+        logger.error('Failed to delete old avatar', {
+          oldAvatarUrl,
+          error: deleteError.message,
+        });
+
+        // TODO: MONITORING (Future)
+        // Track failed deletions for cleanup job
+        // Orphaned files waste storage space
+        // Priority: Low (implement scheduled cleanup task)
+      }
+    }
+
+    logger.info('Avatar uploaded successfully', {
+      userId,
+      newAvatarUrl,
+      oldAvatarUrl,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        user: updatedUser,
+      },
+      message: 'Avatar uploaded successfully',
+    });
+  } catch (error) {
+    logger.error('Error in uploadAvatar', {
+      userId: req.user?.userId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to upload avatar',
+      },
+    });
+  }
+}
+
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
   getUserProfile,
   searchUsers,
   updateStatus,
+  uploadAvatar,
 };
