@@ -162,8 +162,55 @@ function validateProfileUpdate(req, res, next) {
   next();
 }
 
+/**
+ * Validate status update input
+ *
+ * @param {Object} req - request object
+ * @param {Object} res - response object
+ * @param {Function} next - next middleware function (callback)
+ */
+function validateStatusUpdate(req, res, next) {
+  const { status } = req.body;
+  const errors = [];
+
+  // Status is required
+  if (status === undefined || status === null) {
+    errors.push('Status is required');
+  } else {
+    const validStatuses = ['online', 'offline', 'away', 'busy'];
+    if (typeof status !== 'string') {
+      errors.push('Status must be a string');
+    } else if (!validStatuses.includes(status)) {
+      errors.push(`Status must be one of: ${validStatuses.join(', ')}`);
+    }
+  }
+
+  // Check for extra fields (only status should be in the body)
+  const allowedFields = ['status'];
+  const providedFields = Object.keys(req.body);
+  const extraFields = providedFields.filter(field => !allowedFields.includes(field));
+
+  if (extraFields.length > 0) {
+    errors.push(`Unexpected fields: ${extraFields.join(', ')}`);
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid input',
+        details: errors,
+      },
+    });
+  }
+
+  next();
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
   validateProfileUpdate,
+  validateStatusUpdate,
 };
