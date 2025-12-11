@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const userController = require('../controllers/userController');
 const { requireAuth } = require('../middleware/auth');
-const { validateProfileUpdate } = require('../middleware/validation');
+const { validateProfileUpdate, validateStatusUpdate } = require('../middleware/validation');
 
 /**
  * Rate limiters for user endpoints
@@ -60,6 +60,28 @@ router.put(
   validateProfileUpdate,
   userController.updateCurrentUser
 );
+
+/**
+ * @route   PUT /api/users/me/status
+ * @desc    Update current authenticated user's status
+ * @access  Protected
+ * @body    { status: "online" | "away" | "busy" | "offline" }
+ */
+router.put(
+  '/me/status',
+  requireAuth,
+  profileUpdateLimiter,
+  validateStatusUpdate,
+  userController.updateStatus
+);
+
+/**
+ * @route   GET /api/users/search
+ * @desc    Search users by username or email
+ * @access  Protected
+ * @query   q (search query), limit (optional), offset (optional)
+ */
+router.get('/search', requireAuth, profileViewLimiter, userController.searchUsers);
 
 /**
  * @route   GET /api/users/:userId
