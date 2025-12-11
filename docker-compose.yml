@@ -41,10 +41,41 @@ services:
       timeout: 5s
       retries: 5
 
+  # MinIO Object Storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: chatterbox-minio
+    environment:
+      # TODO: PRODUCTION SECURITY - Update before deploying to production:
+      # 1. Replace hardcoded credentials with environment variables from .env
+      # 2. Use strong random credentials (generate with: openssl rand -base64 32)
+      # 3. Consider using Docker secrets or a secrets management service
+      # Example for production:
+      #   MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      #   MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console (Web UI)
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    networks:
+      - chatterbox-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
 volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  minio_data:
     driver: local
 
 networks:
