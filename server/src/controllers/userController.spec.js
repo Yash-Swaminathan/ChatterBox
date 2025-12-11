@@ -388,6 +388,365 @@ describe('User Controller Tests', () => {
     });
   });
 
+  describe('GET /api/users/search', () => {
+    it('should search users by username successfully', async () => {
+      const searchResults = {
+        users: [
+          { id: '1', username: 'john', display_name: 'John Doe', status: 'online' },
+          { id: '2', username: 'johnny', display_name: 'Johnny Smith', status: 'away' },
+        ],
+        total: 2,
+      };
+
+      User.searchUsers.mockResolvedValue(searchResults);
+
+      const response = await request(app)
+        .get('/api/users/search?q=john')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.users).toHaveLength(2);
+      expect(response.body.pagination).toHaveProperty('total', 2);
+      expect(response.body.pagination).toHaveProperty('limit', 20);
+      expect(response.body.pagination).toHaveProperty('offset', 0);
+      expect(response.body.pagination).toHaveProperty('hasMore', false);
+      expect(User.searchUsers).toHaveBeenCalledWith('john', 20, 0);
+    });
+
+    it('should search users by email successfully', async () => {
+      const searchResults = {
+        users: [{ id: '1', username: 'testuser', display_name: 'Test', status: 'online' }],
+        total: 1,
+      };
+
+      User.searchUsers.mockResolvedValue(searchResults);
+
+      const response = await request(app)
+        .get('/api/users/search?q=test@example.com')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.users).toHaveLength(1);
+      expect(User.searchUsers).toHaveBeenCalledWith('test@example.com', 20, 0);
+    });
+
+    it('should handle pagination parameters correctly', async () => {
+      const searchResults = {
+        users: [
+          { id: '1', username: 'user1', display_name: 'User 1', status: 'online' },
+          { id: '2', username: 'user2', display_name: 'User 2', status: 'away' },
+        ],
+        total: 25,
+      };
+
+      User.searchUsers.mockResolvedValue(searchResults);
+
+      const response = await request(app)
+        .get('/api/users/search?q=user&limit=10&offset=5')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.pagination.limit).toBe(10);
+      expect(response.body.pagination.offset).toBe(5);
+      expect(response.body.pagination.total).toBe(25);
+      expect(response.body.pagination.hasMore).toBe(true);
+      expect(User.searchUsers).toHaveBeenCalledWith('user', 10, 5);
+    });
+
+    it('should cap limit at maximum (50)', async () => {
+      const searchResults = { users: [], total: 0 };
+      User.searchUsers.mockResolvedValue(searchResults);
+
+      const response = await request(app)
+        .get('/api/users/search?q=test&limit=100')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(User.searchUsers).toHaveBeenCalledWith('test', 50, 0);
+    });
+
+    it('should use default pagination if not provided', async () => {
+      const searchResults = { users: [], total: 0 };
+      User.searchUsers.mockResolvedValue(searchResults);
+
+      const response = await request(app)
+        .get('/api/users/search?q=test')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(User.searchUsers).toHaveBeenCalledWith('test', 20, 0);
+    });
+
+    it('should return empty results for no matches', async () => {
+      User.searchUsers.mockResolvedValue({ users: [], total: 0 });
+
+      const response = await request(app)
+        .get('/api/users/search?q=nonexistent')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.users).toHaveLength(0);
+      expect(response.body.pagination.total).toBe(0);
+      expect(response.body.pagination.hasMore).toBe(false);
+    });
+
+    it('should return 400 if query parameter is missing', async () => {
+      const response = await request(app)
+        .get('/api/users/search')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('MISSING_QUERY');
+    });
+
+    it('should return 400 if query is too short (< 2 chars)', async () => {
+      const response = await request(app)
+        .get('/api/users/search?q=a')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('QUERY_TOO_SHORT');
+    });
+
+    it('should return 401 if no auth token provided', async () => {
+      const response = await request(app).get('/api/users/search?q=test');
+
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should return 500 if database error occurs', async () => {
+      User.searchUsers.mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .get('/api/users/search?q=test')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+    });
+
+    it('should not return sensitive fields in search results', async () => {
+      const searchResults = {
+        users: [
+          {
+            id: '1',
+            username: 'john',
+            display_name: 'John Doe',
+            bio: 'Hello',
+            avatar_url: null,
+            status: 'online',
+            created_at: new Date(),
+          },
+        ],
+        total: 1,
+      };
+
+      User.searchUsers.mockResolvedValue(searchResults);
+
+      const response = await request(app)
+        .get('/api/users/search?q=john')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      const user = response.body.data.users[0];
+      expect(user).not.toHaveProperty('email');
+      expect(user).not.toHaveProperty('phone_number');
+      expect(user).not.toHaveProperty('password_hash');
+    });
+
+    it('should handle invalid pagination parameters gracefully', async () => {
+      const searchResults = { users: [], total: 0 };
+      User.searchUsers.mockResolvedValue(searchResults);
+
+      const response = await request(app)
+        .get('/api/users/search?q=test&limit=invalid&offset=-5')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      // Should use defaults: limit=20, offset=0
+      expect(User.searchUsers).toHaveBeenCalledWith('test', 20, 0);
+    });
+  });
+
+  describe('PUT /api/users/me/status', () => {
+    it('should update status to online successfully', async () => {
+      const result = {
+        id: mockUser.id,
+        status: 'online',
+        last_seen: new Date(),
+      };
+
+      User.updateUserStatus.mockResolvedValue(result);
+
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'online' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('online');
+      expect(response.body.data).toHaveProperty('last_seen');
+      expect(User.updateUserStatus).toHaveBeenCalledWith(mockUser.id, 'online');
+    });
+
+    it('should update status to away successfully', async () => {
+      const result = {
+        id: mockUser.id,
+        status: 'away',
+        last_seen: new Date(),
+      };
+
+      User.updateUserStatus.mockResolvedValue(result);
+
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'away' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('away');
+    });
+
+    it('should update status to busy successfully', async () => {
+      const result = {
+        id: mockUser.id,
+        status: 'busy',
+        last_seen: new Date(),
+      };
+
+      User.updateUserStatus.mockResolvedValue(result);
+
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'busy' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('busy');
+    });
+
+    it('should update status to offline successfully', async () => {
+      const result = {
+        id: mockUser.id,
+        status: 'offline',
+        last_seen: new Date(),
+      };
+
+      User.updateUserStatus.mockResolvedValue(result);
+
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'offline' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('offline');
+    });
+
+    it('should return 400 if status is missing', async () => {
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should return 400 if status is invalid', async () => {
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'invalid_status' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should return 400 if extra fields are provided', async () => {
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'online', extra_field: 'not allowed' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should return 400 if status is not a string', async () => {
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 123 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should return 401 if no auth token provided', async () => {
+      const response = await request(app).put('/api/users/me/status').send({ status: 'online' });
+
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should return 404 if user not found', async () => {
+      User.updateUserStatus.mockResolvedValue(null);
+
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'online' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('USER_NOT_FOUND');
+    });
+
+    it('should return 400 if model throws validation error', async () => {
+      User.updateUserStatus.mockRejectedValue(
+        new Error('Status must be one of: online, offline, away, busy')
+      );
+
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'online' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('INVALID_STATUS');
+    });
+
+    it('should return 500 if database error occurs', async () => {
+      User.updateUserStatus.mockRejectedValue(new Error('Database connection failed'));
+
+      const response = await request(app)
+        .put('/api/users/me/status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ status: 'online' });
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+    });
+  });
+
   describe('Edge Cases and Security', () => {
     it('should not allow updating email through profile update', async () => {
       const updatedUser = { ...mockUser };
