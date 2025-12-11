@@ -293,6 +293,137 @@ async function getUserByUsername(username) {
 }
 
 /**
+ * Search users by username or email with pagination
+ * @param {string} query - Search query (username or email)
+ * @param {number} limit - Maximum number of results
+ * @param {number} offset - Number of results to skip
+ * @returns {Promise<Object>} Object with users array and total count
+ */
+async function searchUsers(query, limit = 20, offset = 0) {
+  try {
+    // Validate query
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      logger.warn('Invalid search query', { query });
+      return { users: [], total: 0 };
+    }
+
+    const searchPattern = `%${query.trim()}%`;
+
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM users
+      WHERE
+        is_active = TRUE
+        AND (
+          username ILIKE $1
+          OR email ILIKE $1
+        )
+    `;
+
+    const countResult = await pool.query(countQuery, [searchPattern]);
+    const total = parseInt(countResult.rows[0].total, 10);
+
+    // Get paginated results
+    const searchQuery = `
+      SELECT
+        id,
+        username,
+        display_name,
+        bio,
+        avatar_url,
+        status,
+        created_at
+      FROM users
+      WHERE
+        is_active = TRUE
+        AND (
+          username ILIKE $1
+          OR email ILIKE $1
+        )
+      ORDER BY username
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await pool.query(searchQuery, [searchPattern, limit, offset]);
+
+    logger.info('User search completed', {
+      query,
+      resultsFound: result.rows.length,
+      total,
+    });
+
+    return {
+      users: result.rows,
+      total,
+    };
+  } catch (error) {
+    logger.error('Error in searchUsers', { query, error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * Get public user profile (alias for getPublicUserById for consistency)
+ * @param {string} userId - User UUID
+ * @returns {Promise<Object|null>} Public user object or null if not found
+ */
+async function getPublicUserProfile(userId) {
+  return await getPublicUserById(userId);
+}
+
+/**
+ * Update user status
+ * @param {string} userId - User UUID
+ * @param {string} status - New status (online, offline, away, busy)
+ * @returns {Promise<Object|null>} Updated user status info or null if not found
+ */
+async function updateUserStatus(userId, status) {
+  try {
+    // Validate UUID format
+    if (!isValidUUID(userId)) {
+      logger.warn('Invalid UUID format for updateUserStatus', { userId });
+      return null;
+    }
+
+    // Validate status value
+    const validStatuses = ['online', 'offline', 'away', 'busy'];
+    if (!validStatuses.includes(status)) {
+      logger.warn('Invalid status value', { userId, status });
+      throw new Error(`Status must be one of: ${validStatuses.join(', ')}`);
+    }
+
+    const query = `
+      UPDATE users
+      SET
+        status = $1,
+        last_seen = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2 AND is_active = true
+      RETURNING id, status, last_seen
+    `;
+
+    const result = await pool.query(query, [status, userId]);
+
+    if (result.rows.length === 0) {
+      logger.info('User not found for status update', { userId });
+      return null;
+    }
+
+    logger.info('User status updated successfully', { userId, status });
+
+    return result.rows[0];
+  } catch (error) {
+    logger.error('Error in updateUserStatus', {
+      userId,
+      status,
+      error: error.message,
+    });
+    throw error;
+  }
+}
+
+/**
  * Validate UUID format
  * @param {string} uuid - UUID string to validate
  * @returns {boolean} True if valid UUID
@@ -309,7 +440,10 @@ function isValidUUID(uuid) {
 module.exports = {
   getUserById,
   getPublicUserById,
+  getPublicUserProfile,
   updateUserProfile,
+  updateUserStatus,
+  searchUsers,
   checkUserExists,
   getUserByEmail,
   getUserByUsername,
