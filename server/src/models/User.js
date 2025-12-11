@@ -307,7 +307,19 @@ async function searchUsers(query, limit = 20, offset = 0) {
       return { users: [], total: 0 };
     }
 
+    // TODO: SECURITY CONSIDERATION (Future)
+    // Monitor for search enumeration attacks (users systematically searching emails)
+    // Consider adding rate limiting specifically for search or obfuscating results
+    // Track failed/suspicious search patterns and alert
+    // Priority: Low (monitor for abuse, implement if needed)
+
     const searchPattern = `%${query.trim()}%`;
+
+    // TODO: PERFORMANCE OPTIMIZATION (Future)
+    // Consider using window functions to combine count + results in a single query:
+    // SELECT id, username, ..., COUNT(*) OVER() as total_count
+    // This would eliminate the separate count query and improve performance
+    // Priority: Medium (optimize when user base grows beyond 10k users)
 
     // Get total count
     const countQuery = `
@@ -323,6 +335,23 @@ async function searchUsers(query, limit = 20, offset = 0) {
 
     const countResult = await pool.query(countQuery, [searchPattern]);
     const total = parseInt(countResult.rows[0].total, 10);
+
+    // TODO: SEARCH RELEVANCE (Future Enhancement)
+    // Add relevance-based ordering for better UX:
+    // ORDER BY CASE
+    //   WHEN username = query THEN 1 (exact match)
+    //   WHEN username ILIKE query || '%' THEN 2 (starts with)
+    //   ELSE 3 (contains)
+    // END, username
+    // Priority: Low (nice-to-have for better search experience)
+
+    // TODO: PERFORMANCE OPTIMIZATION (Future)
+    // Consider adding trigram indexes for better ILIKE performance:
+    // CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    // CREATE INDEX idx_users_username_trgm ON users USING gin (username gin_trgm_ops);
+    // CREATE INDEX idx_users_email_trgm ON users USING gin (email gin_trgm_ops);
+    // This improves search with leading wildcards (%query%)
+    // Priority: Medium (add when search queries become slow >100ms)
 
     // Get paginated results
     const searchQuery = `

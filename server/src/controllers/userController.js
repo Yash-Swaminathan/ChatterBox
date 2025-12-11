@@ -190,8 +190,23 @@ async function searchUsers(req, res) {
     // Get pagination parameters
     const { limit, offset } = getPaginationParams(req);
 
+    // TODO: CACHING OPTIMIZATION (Future)
+    // Consider caching search results in Redis for common queries:
+    // const cacheKey = `search:${query}:${limit}:${offset}`;
+    // TTL: 30-60 seconds (balance freshness vs performance)
+    // This reduces DB load for repeated searches
+    // Priority: Medium (implement when search load increases)
+
     // Search users
     const { users, total } = await User.searchUsers(query, limit, offset);
+
+    // TODO: SEARCH ANALYTICS (Future Enhancement)
+    // Track search queries for UX improvements and analytics:
+    // - Most popular searches
+    // - Searches with no results (to improve data or suggestions)
+    // - User search patterns (for personalization)
+    // Consider storing in separate analytics table or sending to analytics service
+    // Priority: Low (nice-to-have for product insights)
 
     logger.info('User search completed', {
       query,
@@ -322,8 +337,8 @@ async function updateStatus(req, res) {
 
     const { status } = req.body;
 
-    // Validation middleware should have already validated status
-    // But double-check for safety
+    // Defense-in-depth: middleware should catch this, but verify to be safe
+    // This redundant check protects against middleware bypass or misconfiguration
     if (!status) {
       return res.status(400).json({
         success: false,
