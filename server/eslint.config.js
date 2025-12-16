@@ -46,6 +46,19 @@ module.exports = [
     },
   },
   {
+    // k6 load test scripts use ES module syntax (import/export)
+    files: ['**/tests/load/**/*.k6.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.es2021,
+        __ENV: 'readonly',
+        __VU: 'readonly',
+      },
+    },
+  },
+  {
     ignores: ['node_modules/', 'dist/', 'build/'],
   },
 ];
