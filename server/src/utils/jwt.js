@@ -16,11 +16,12 @@ const REFRESH_TOKEN_EXPIRY = '7d'; // 7 days
 /**
  * Generate an access token (15 minute expiry)
  * @param {TokenPayload} payload - User data to encode
+ * @param {string} [expiresIn] - Optional custom expiry (for testing)
  * @returns {string} JWT access token
  */
-function generateAccessToken(payload) {
+function generateAccessToken(payload, expiresIn) {
   return jwt.sign(payload, ACCESS_TOKEN_SECRET, {
-    expiresIn: ACCESS_TOKEN_EXPIRY,
+    expiresIn: expiresIn || ACCESS_TOKEN_EXPIRY,
   });
 }
 
