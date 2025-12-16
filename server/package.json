@@ -7,6 +7,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "cross-env NODE_ENV=test jest",
+    "test:socket": "cross-env NODE_ENV=test jest src/socket",
+    "test:socket:smoke": "k6 run tests/load/socket-smoke-test.k6.js",
+    "test:socket:load": "k6 run tests/load/socket-load-test.k6.js",
     "lint": "eslint src/**/*.js",
     "lint:fix": "eslint src/**/*.js --fix",
     "format": "prettier --write \"src/**/*.js\"",
@@ -24,6 +27,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -47,6 +51,7 @@
     "jest": "^30.2.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.6.2",
+    "socket.io-client": "^4.8.1",
     "supertest": "^7.1.4"
   }
 }

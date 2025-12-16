@@ -136,9 +136,7 @@ function generateAvatarFilename(userId, originalname) {
     // Extract file extension (lowercase)
     // Handle files without extensions by defaulting to .jpg
     const lastDotIndex = originalname.lastIndexOf('.');
-    const ext = lastDotIndex !== -1
-      ? originalname.toLowerCase().substring(lastDotIndex)
-      : '.jpg'; // Default extension for files without one
+    const ext = lastDotIndex !== -1 ? originalname.toLowerCase().substring(lastDotIndex) : '.jpg'; // Default extension for files without one
 
     // Generate unique ID
     const uniqueId = uuidv4();
