@@ -6,3 +6,4 @@ client/.env
 .env
 .history/
 test-user-api.sh
+.env.example
