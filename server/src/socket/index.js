@@ -3,8 +3,8 @@ const { createAdapter } = require('@socket.io/redis-adapter');
 const { createClient } = require('redis');
 const logger = require('../utils/logger');
 const connectionHandler = require('./handlers/connectionHandler');
+const socketAuthMiddleware = require('./middleware/socketAuth');
 
-// TODO: Week 3, Day 3-4 - Add authentication middleware
 // TODO: Week 3, Day 5-7 - Add presence tracking on connection
 // TODO: Week 4 - Add message event handlers
 // TODO: Production - Configure sticky sessions in load balancer (Nginx)
@@ -40,6 +40,10 @@ async function initializeSocket(httpServer) {
 
     // Initialize Redis adapter for multi-server support
     await initializeRedisAdapter(io);
+
+    // Apply authentication middleware
+    io.use(socketAuthMiddleware);
+    logger.info('Socket authentication middleware applied');
 
     // Set up connection handlers
     connectionHandler(io);
