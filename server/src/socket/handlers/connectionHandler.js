@@ -8,10 +8,11 @@ const logger = require('../../utils/logger');
 
 // Track user connections (userId -> Set of socket IDs)
 // Allows handling multiple connections per user (multiple tabs/devices)
-// TODO: Week 3, Day 3-4 - Implement cleanup for userSockets Map to prevent memory leaks
-// TODO: Consider adding TTL or periodic cleanup for stale connections
-// TODO: Add monitoring for userSockets Map size in production
 const userSockets = new Map();
+
+// Stale connection cleanup interval
+const STALE_THRESHOLD = 3600000; // 1 hour
+const CLEANUP_INTERVAL = 300000; // 5 minutes
 
 // Track connection metrics
 const connectionMetrics = {
@@ -33,6 +34,9 @@ function connectionHandler(io) {
     handleConnection(socket);
     setupEventHandlers(socket, io);
   });
+
+  // Start stale connection cleanup
+  startStaleConnectionCleanup(io);
 
   // Graceful shutdown handler
   setupGracefulShutdown(io);
@@ -153,7 +157,7 @@ function handleDisconnection(socket, reason) {
     duration: `${(connectionDuration / 1000).toFixed(2)}s`,
     timestamp: new Date().toISOString(),
     activeConnections: connectionMetrics.activeConnections,
-    remainingUserConnections: getUserSockets(userId).size,
+    totalUserConnections: getUserSockets(userId).size,
   });
 
   // Cleanup socket-specific resources
@@ -233,6 +237,68 @@ function getUserSockets(userId) {
 }
 
 /**
+ * Start periodic cleanup of stale connections
+ * Removes socket IDs that no longer exist in the server
+ * @param {SocketIO.Server} io - Socket.io server instance
+ */
+function startStaleConnectionCleanup(io) {
+  const cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    let cleanedConnections = 0;
+    let cleanedUsers = 0;
+
+    userSockets.forEach((socketIds, userId) => {
+      socketIds.forEach(socketId => {
+        const socket = io.sockets.sockets.get(socketId);
+
+        // Remove if socket doesn't exist or is stale
+        if (!socket || (socket.connectedAt && now - socket.connectedAt > STALE_THRESHOLD)) {
+          logger.warn('Removing stale socket', {
+            userId,
+            socketId,
+            exists: !!socket,
+            age: socket ? `${((now - socket.connectedAt) / 1000 / 60).toFixed(1)}min` : 'N/A',
+          });
+          socketIds.delete(socketId);
+          cleanedConnections++;
+        }
+      });
+
+      // Remove user entry if no more connections
+      if (socketIds.size === 0) {
+        userSockets.delete(userId);
+        cleanedUsers++;
+      }
+    });
+
+    if (cleanedConnections > 0 || cleanedUsers > 0) {
+      logger.info('Stale connection cleanup completed', {
+        cleanedConnections,
+        cleanedUsers,
+        remainingUsers: userSockets.size,
+        totalSockets: Array.from(userSockets.values()).reduce(
+          (acc, set) => acc + set.size,
+          0
+        ),
+      });
+    }
+  }, CLEANUP_INTERVAL);
+
+  // Use unref() to allow process to exit even if interval is active (important for tests)
+  cleanupInterval.unref();
+
+  // Clear interval on shutdown
+  const clearCleanup = () => clearInterval(cleanupInterval);
+  process.on('SIGTERM', clearCleanup);
+  process.on('SIGINT', clearCleanup);
+
+  logger.info('Stale connection cleanup started', {
+    interval: `${CLEANUP_INTERVAL / 1000}s`,
+    threshold: `${STALE_THRESHOLD / 1000 / 60}min`,
+  });
+}
+
+/**
  * Set up graceful shutdown handler
  * @param {SocketIO.Server} io - Socket.io server instance
  */
@@ -278,10 +344,22 @@ function getConnectionMetrics() {
 
 /**
  * Disconnect all sockets for a specific user
- * Useful for account deletion, security incidents, or forced logout
+ * Useful for account deletion, security incidents, or forced logout.
+ * Sends a 'force:disconnect' event to all user's devices before disconnecting.
+ *
  * @param {SocketIO.Server} io - Socket.io server instance
  * @param {string} userId - User ID to disconnect
- * @param {string} reason - Reason for disconnection
+ * @param {string} [reason='forced_disconnect'] - Reason for disconnection (e.g., 'account_deleted', 'security_incident', 'admin_action')
+ * @returns {number} Number of sockets disconnected (0 if user has no active connections)
+ *
+ * @example
+ * // Disconnect user after account deletion
+ * const count = disconnectUser(io, 'user-123', 'account_deleted');
+ * console.log(`Disconnected ${count} devices`);
+ *
+ * @example
+ * // Force logout for security incident
+ * disconnectUser(io, 'compromised-user-id', 'security_incident');
  */
 function disconnectUser(io, userId, reason = 'forced_disconnect') {
   const socketIds = getUserSockets(userId);

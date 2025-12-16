@@ -23,9 +23,9 @@ function extractToken(handshake) {
     const authHeader = handshake.headers?.authorization;
     if (authHeader && typeof authHeader === 'string') {
       const match = authHeader.match(/^Bearer\s+(.+)$/i);
-      if (match && match[1]) {
-        const trimmedToken = match[1].trim();
-        return trimmedToken || null; // Return null if empty after trim
+      const trimmedToken = match?.[1]?.trim();
+      if (trimmedToken) {
+        return trimmedToken;
       }
     }
 

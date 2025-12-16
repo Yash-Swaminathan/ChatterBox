@@ -93,6 +93,17 @@ describe('Socket Authentication Middleware', () => {
       const token = extractToken(handshake);
       expect(token).toBeNull();
     });
+
+    it('should handle null or undefined handshake fields gracefully', () => {
+      const handshake = {
+        auth: null,
+        query: undefined,
+        headers: null,
+      };
+
+      const token = extractToken(handshake);
+      expect(token).toBeNull();
+    });
   });
 
   describe('socketAuthMiddleware', () => {
