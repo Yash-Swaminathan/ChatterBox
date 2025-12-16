@@ -56,25 +56,40 @@ function handleConnection(socket) {
     connectionMetrics.byTransport[transport]++;
   }
 
+  // Get authenticated user data
+  const { userId, username } = socket.user;
+
+  // Join user-specific room for direct messaging and notifications
+  socket.join(`user:${userId}`);
+
+  // Track user connection (supports multi-device)
+  trackUserConnection(userId, socket.id);
+
   // Log connection details
-  logger.info('Client connected', {
+  logger.info('Authenticated user connected', {
     socketId: socket.id,
+    userId,
+    username,
+    userRoom: `user:${userId}`,
     transport: transport,
     remoteAddress: socket.handshake.address,
     timestamp: new Date(connectedAt).toISOString(),
     activeConnections: connectionMetrics.activeConnections,
+    totalUserConnections: getUserSockets(userId).size,
   });
 
-  // TODO: Week 3, Day 3-4 - After JWT auth is implemented:
-  // const userId = socket.user?.userId;
-  // if (userId) {
-  //   trackUserConnection(userId, socket.id);
-  // }
+  // Notify user of successful authentication
+  socket.emit('auth:success', {
+    userId,
+    username,
+    connectedAt: new Date(connectedAt).toISOString(),
+  });
 
   // Handle transport upgrade (polling -> websocket)
   socket.conn.on('upgrade', transport => {
     logger.info('Transport upgraded', {
       socketId: socket.id,
+      userId,
       from: socket.conn.transport.name,
       to: transport.name,
     });
@@ -123,20 +138,23 @@ function handleDisconnection(socket, reason) {
   connectionMetrics.totalDisconnections++;
   connectionMetrics.activeConnections--;
 
+  // Get authenticated user data
+  const { userId, username } = socket.user;
+
+  // Remove user connection
+  removeUserConnection(userId, socket.id);
+
   // Log disconnection
-  logger.info('Client disconnected', {
+  logger.info('Authenticated user disconnected', {
     socketId: socket.id,
+    userId,
+    username,
     reason: reason,
     duration: `${(connectionDuration / 1000).toFixed(2)}s`,
     timestamp: new Date().toISOString(),
     activeConnections: connectionMetrics.activeConnections,
+    remainingUserConnections: getUserSockets(userId).size,
   });
-
-  // TODO: Week 3, Day 3-4 - After JWT auth is implemented:
-  // const userId = socket.user?.userId;
-  // if (userId) {
-  //   removeUserConnection(userId, socket.id);
-  // }
 
   // Cleanup socket-specific resources
   socket.removeAllListeners();
@@ -168,10 +186,8 @@ function handleError(socket, error) {
  * Track user connection (for multiple devices/tabs)
  * @param {string} userId - User ID
  * @param {string} socketId - Socket ID
- * TODO: Week 3, Day 3-4 - Use this function after authentication is implemented
  */
-// eslint-disable-next-line no-unused-vars
-function _trackUserConnection(userId, socketId) {
+function trackUserConnection(userId, socketId) {
   if (!userSockets.has(userId)) {
     userSockets.set(userId, new Set());
   }
@@ -188,10 +204,8 @@ function _trackUserConnection(userId, socketId) {
  * Remove user connection
  * @param {string} userId - User ID
  * @param {string} socketId - Socket ID
- * TODO: Week 3, Day 3-4 - Use this function after authentication is implemented
  */
-// eslint-disable-next-line no-unused-vars
-function _removeUserConnection(userId, socketId) {
+function removeUserConnection(userId, socketId) {
   if (userSockets.has(userId)) {
     userSockets.get(userId).delete(socketId);
 
@@ -262,6 +276,48 @@ function getConnectionMetrics() {
   };
 }
 
+/**
+ * Disconnect all sockets for a specific user
+ * Useful for account deletion, security incidents, or forced logout
+ * @param {SocketIO.Server} io - Socket.io server instance
+ * @param {string} userId - User ID to disconnect
+ * @param {string} reason - Reason for disconnection
+ */
+function disconnectUser(io, userId, reason = 'forced_disconnect') {
+  const socketIds = getUserSockets(userId);
+
+  if (socketIds.size === 0) {
+    logger.warn('No active connections found for user', { userId });
+    return 0;
+  }
+
+  let disconnectedCount = 0;
+
+  socketIds.forEach(socketId => {
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+      // Notify client before disconnecting
+      socket.emit('force:disconnect', {
+        reason,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Disconnect socket
+      socket.disconnect(true);
+      disconnectedCount++;
+    }
+  });
+
+  logger.info('User forcefully disconnected', {
+    userId,
+    reason,
+    socketsDisconnected: disconnectedCount,
+  });
+
+  return disconnectedCount;
+}
+
 module.exports = connectionHandler;
 module.exports.getUserSockets = getUserSockets;
 module.exports.getConnectionMetrics = getConnectionMetrics;
+module.exports.disconnectUser = disconnectUser;
