@@ -67,10 +67,30 @@ async function initializeRedisAdapter(io) {
   try {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
+    if (!process.env.REDIS_URL) {
+      logger.warn('REDIS_URL not set, using default redis://localhost:6379');
+    }
+
     logger.info('Initializing Redis adapter', { redisUrl });
 
-    // Create Redis clients for pub/sub
-    const pubClient = createClient({ url: redisUrl });
+    // Create Redis clients with connection pooling and retry strategy
+    const redisConfig = {
+      url: redisUrl,
+      socket: {
+        reconnectStrategy: retries => {
+          if (retries > 10) {
+            logger.error('Redis max reconnection attempts reached');
+            return new Error('Redis reconnection failed');
+          }
+          const delay = Math.min(retries * 50, 500);
+          logger.info(`Redis reconnecting in ${delay}ms (attempt ${retries})`);
+          return delay;
+        },
+        connectTimeout: 5000,
+      },
+    };
+
+    const pubClient = createClient(redisConfig);
     const subClient = pubClient.duplicate();
 
     // Error handlers
@@ -91,9 +111,23 @@ async function initializeRedisAdapter(io) {
       logger.info('Redis sub client connected');
     });
 
-    // Connect to Redis
-    await pubClient.connect();
-    await subClient.connect();
+    // Reconnection handlers
+    pubClient.on('reconnecting', () => {
+      logger.warn('Redis pub client reconnecting');
+    });
+
+    subClient.on('reconnecting', () => {
+      logger.warn('Redis sub client reconnecting');
+    });
+
+    // Connect to Redis with timeout
+    const connectionTimeout = 10000; // 10 seconds
+    await Promise.race([
+      Promise.all([pubClient.connect(), subClient.connect()]),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Redis connection timeout')), connectionTimeout)
+      ),
+    ]);
 
     // Attach Redis adapter to Socket.io
     io.adapter(createAdapter(pubClient, subClient));
@@ -106,16 +140,20 @@ async function initializeRedisAdapter(io) {
     // Graceful shutdown handler
     process.on('SIGTERM', async () => {
       logger.info('SIGTERM received, closing Redis connections');
-      await pubClient.quit();
-      await subClient.quit();
+      try {
+        await Promise.all([pubClient.quit(), subClient.quit()]);
+        logger.info('Redis connections closed successfully');
+      } catch (err) {
+        logger.error('Error closing Redis connections', { error: err.message });
+      }
     });
   } catch (error) {
-    logger.error('Redis adapter initialization failed, running in single-server mode', {
+    logger.warn('Redis adapter initialization failed, falling back to single-server mode', {
       error: error.message,
-      stack: error.stack,
+      reason: 'Socket.io will continue in single-instance mode without Redis',
     });
     // Don't throw - allow server to continue without Redis adapter
-    // Socket.io will work in single-server mode
+    // Socket.io will work in single-server mode (in-memory adapter)
   }
 }
 

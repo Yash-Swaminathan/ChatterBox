@@ -40,55 +40,65 @@ async function startServer() {
 }
 
 function setupShutdownHandlers(server, io) {
-  // shutdown from process manager or hosting environment
-  process.on('SIGTERM', () => {
-    console.log('Shutting down gracefully...');
-    logger.info('SIGTERM received, initiating graceful shutdown');
+  const SHUTDOWN_TIMEOUT = 30000; // 30 seconds
+  let isShuttingDown = false;
 
-    // Close Socket.io connections first
+  const gracefulShutdown = signal => {
+    if (isShuttingDown) {
+      logger.warn('Shutdown already in progress, ignoring duplicate signal');
+      return;
+    }
+    isShuttingDown = true;
+
+    console.log(`\n${signal} received, shutting down gracefully...`);
+    logger.info(`${signal} received, initiating graceful shutdown`);
+
+    // Set up force-kill timeout
+    const shutdownTimer = setTimeout(() => {
+      logger.error('Shutdown timeout exceeded, forcing exit');
+      console.error('Shutdown timeout - forcing exit');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT);
+
+    // Close Socket.io connections first, then HTTP server
     if (io) {
       io.close(() => {
         logger.info('Socket.io closed');
+
+        // After Socket.io is closed, close HTTP server
+        server.close(err => {
+          clearTimeout(shutdownTimer);
+          if (err) {
+            console.error('Error closing server:', err);
+            logger.error('Error during shutdown', { error: err.message });
+            process.exit(1);
+          }
+          console.log('Server closed');
+          logger.info('Server shutdown complete');
+          process.exit(0);
+        });
+      });
+    } else {
+      // No Socket.io to close, just close HTTP server
+      server.close(err => {
+        clearTimeout(shutdownTimer);
+        if (err) {
+          console.error('Error closing server:', err);
+          logger.error('Error during shutdown', { error: err.message });
+          process.exit(1);
+        }
+        console.log('Server closed');
+        logger.info('Server shutdown complete');
+        process.exit(0);
       });
     }
+  };
 
-    // Then close HTTP server
-    server.close(err => {
-      if (err) {
-        console.error('Error closing server:', err);
-        logger.error('Error during shutdown', { error: err.message });
-        process.exit(1);
-      }
-      console.log('Server closed');
-      logger.info('Server shutdown complete');
-      process.exit(0);
-    });
-  });
+  // Handle shutdown from process manager or hosting environment
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-  // force shutdown
-  process.on('SIGINT', () => {
-    console.log('\nSIGINT received, shutting down gracefully...');
-    logger.info('SIGINT received, initiating graceful shutdown');
-
-    // Close Socket.io connections first
-    if (io) {
-      io.close(() => {
-        logger.info('Socket.io closed');
-      });
-    }
-
-    // Then close HTTP server
-    server.close(err => {
-      if (err) {
-        console.error('Error closing server:', err);
-        logger.error('Error during shutdown', { error: err.message });
-        process.exit(1);
-      }
-      console.log('Server closed');
-      logger.info('Server shutdown complete');
-      process.exit(0);
-    });
-  });
+  // Handle Ctrl+C in terminal
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 // Start the server

@@ -8,6 +8,9 @@ const logger = require('../../utils/logger');
 
 // Track user connections (userId -> Set of socket IDs)
 // Allows handling multiple connections per user (multiple tabs/devices)
+// TODO: Week 3, Day 3-4 - Implement cleanup for userSockets Map to prevent memory leaks
+// TODO: Consider adding TTL or periodic cleanup for stale connections
+// TODO: Add monitoring for userSockets Map size in production
 const userSockets = new Map();
 
 // Track connection metrics
