@@ -16,7 +16,19 @@ const logger = require('../../utils/logger');
 // Priority: Low (advanced feature)
 
 const RATE_LIMIT_WINDOW = 5000;
+const RATE_LIMIT_CLEANUP_INTERVAL = 3600000; // 1 hour
 const rateLimitMap = new Map();
+
+// Periodic cleanup of old rate limit entries to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, timestamp] of rateLimitMap.entries()) {
+    if (now - timestamp > RATE_LIMIT_WINDOW) {
+      rateLimitMap.delete(userId);
+    }
+  }
+  logger.debug('Rate limit map cleaned', { remainingEntries: rateLimitMap.size });
+}, RATE_LIMIT_CLEANUP_INTERVAL);
 
 /**
  * Handle presence:update event (custom status changes)
@@ -28,10 +40,17 @@ const rateLimitMap = new Map();
 async function handlePresenceUpdate(io, socket, data) {
   try {
     const { userId } = socket.user;
+
+    // Validate input data
+    if (!data || typeof data !== 'object') {
+      socket.emit('error', { message: 'Invalid request data' });
+      return;
+    }
+
     const { status } = data;
 
-    if (!status) {
-      socket.emit('error', { message: 'Status is required' });
+    if (!status || typeof status !== 'string') {
+      socket.emit('error', { message: 'Status is required and must be a string' });
       return;
     }
 

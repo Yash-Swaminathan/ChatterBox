@@ -21,8 +21,8 @@ const { pool } = require('../config/database');
 // Consider using Redis Sorted Sets for time-based cleanup
 // Priority: Medium (production monitoring)
 
-const PRESENCE_TTL = 60;
-const CONTACT_CACHE_TTL = 300;
+const PRESENCE_TTL = parseInt(process.env.PRESENCE_TTL || '60', 10);
+const CONTACT_CACHE_TTL = parseInt(process.env.CONTACT_CACHE_TTL || '300', 10);
 const VALID_STATUSES = ['online', 'away', 'busy', 'offline'];
 
 /**
