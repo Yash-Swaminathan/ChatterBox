@@ -1,8 +1,8 @@
 const logger = require('../../utils/logger');
+const presenceService = require('../../services/presenceService');
+const { sendInitialPresence, broadcastPresenceChange } = require('./presenceHandler');
+const User = require('../../models/User');
 
-// TODO: Week 3, Day 3-4 - Verify JWT and attach user to socket
-// TODO: Week 3, Day 5-7 - Update user status to 'online' on connect
-// TODO: Week 3, Day 5-7 - Update user status to 'offline' on disconnect
 // TODO: Future - Implement connection rate limiting per IP
 // TODO: Future - Track connection metrics (duration, transport type)
 
@@ -48,7 +48,7 @@ function connectionHandler(io) {
  * Handle new client connection
  * @param {SocketIO.Socket} socket - Client socket instance
  */
-function handleConnection(socket) {
+async function handleConnection(socket) {
   const connectedAt = Date.now();
   socket.connectedAt = connectedAt;
 
@@ -68,6 +68,17 @@ function handleConnection(socket) {
 
   // Track user connection (supports multi-device)
   trackUserConnection(userId, socket.id);
+
+  // Set user as online in Redis and broadcast to contacts
+  await presenceService.setUserOnline(userId, socket.id);
+
+  const presence = await presenceService.getUserPresence(userId);
+  if (presence) {
+    await broadcastPresenceChange(socket.server, userId, presence);
+  }
+
+  // Send initial presence data for user's contacts
+  await sendInitialPresence(socket);
 
   // Log connection details
   logger.info('Authenticated user connected', {
@@ -135,7 +146,7 @@ function setupEventHandlers(socket, _io) {
  * @param {SocketIO.Socket} socket - Client socket instance
  * @param {string} reason - Disconnection reason
  */
-function handleDisconnection(socket, reason) {
+async function handleDisconnection(socket, reason) {
   const connectionDuration = Date.now() - socket.connectedAt;
 
   // Update metrics
@@ -148,6 +159,18 @@ function handleDisconnection(socket, reason) {
   // Remove user connection
   removeUserConnection(userId, socket.id);
 
+  // Update presence to offline if last socket
+  const wentOffline = await presenceService.setUserOffline(userId, socket.id);
+
+  if (wentOffline) {
+    await User.updateLastSeen(userId);
+
+    const presence = await presenceService.getUserPresence(userId);
+    if (presence) {
+      await broadcastPresenceChange(socket.server, userId, presence);
+    }
+  }
+
   // Log disconnection
   logger.info('Authenticated user disconnected', {
     socketId: socket.id,
@@ -158,6 +181,7 @@ function handleDisconnection(socket, reason) {
     timestamp: new Date().toISOString(),
     activeConnections: connectionMetrics.activeConnections,
     totalUserConnections: getUserSockets(userId).size,
+    wentOffline,
   });
 
   // Cleanup socket-specific resources
