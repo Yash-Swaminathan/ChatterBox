@@ -4,8 +4,8 @@ const { createClient } = require('redis');
 const logger = require('../utils/logger');
 const connectionHandler = require('./handlers/connectionHandler');
 const socketAuthMiddleware = require('./middleware/socketAuth');
+const { registerPresenceHandlers, startCleanupJob } = require('./handlers/presenceHandler');
 
-// TODO: Week 3, Day 5-7 - Add presence tracking on connection
 // TODO: Week 4 - Add message event handlers
 // TODO: Production - Configure sticky sessions in load balancer (Nginx)
 // TODO: Production - Enable Socket.io monitoring/metrics (socket.io-admin)
@@ -48,8 +48,17 @@ async function initializeSocket(httpServer) {
     // Set up connection handlers
     connectionHandler(io);
 
+    // Register presence event handlers for all connections
+    io.on('connection', socket => {
+      registerPresenceHandlers(io, socket);
+    });
+
+    // Start periodic presence cleanup (every 5 minutes)
+    startCleanupJob(300000);
+
     logger.info('Socket.io initialization complete', {
       adapterType: io.sockets.adapter.constructor.name,
+      presenceCleanupEnabled: true,
     });
 
     return io;
