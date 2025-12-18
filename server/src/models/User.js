@@ -454,6 +454,76 @@ async function updateUserStatus(userId, status) {
 }
 
 /**
+ * Update user's last seen timestamp
+ * @param {string} userId - User UUID
+ * @returns {Promise<boolean>} True if updated successfully
+ */
+async function updateLastSeen(userId) {
+  try {
+    if (!isValidUUID(userId)) {
+      logger.warn('Invalid UUID format for updateLastSeen', { userId });
+      return false;
+    }
+
+    const query = `
+      UPDATE users
+      SET last_seen = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1 AND is_active = true
+    `;
+
+    const result = await pool.query(query, [userId]);
+
+    if (result.rowCount === 0) {
+      logger.info('User not found for last_seen update', { userId });
+      return false;
+    }
+
+    logger.debug('Last seen timestamp updated', { userId });
+    return true;
+  } catch (error) {
+    logger.error('Error in updateLastSeen', {
+      userId,
+      error: error.message,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Get user's contacts (for presence broadcasting)
+ * @param {string} userId - User UUID
+ * @returns {Promise<string[]>} Array of contact user IDs
+ */
+async function getUserContacts(userId) {
+  try {
+    if (!isValidUUID(userId)) {
+      logger.warn('Invalid UUID format for getUserContacts', { userId });
+      return [];
+    }
+
+    const query = `
+      SELECT contact_user_id
+      FROM contacts
+      WHERE user_id = $1 AND is_blocked = false
+    `;
+
+    const result = await pool.query(query, [userId]);
+    return result.rows.map(row => row.contact_user_id);
+  } catch (error) {
+    if (error.code === '42P01') {
+      logger.debug('Contacts table does not exist yet', { userId });
+      return [];
+    }
+
+    logger.error('Error in getUserContacts', {
+      userId,
+      error: error.message,
+    });
+    throw error;
+  }
+}
+
+/**
  * Validate UUID format
  * @param {string} uuid - UUID string to validate
  * @returns {boolean} True if valid UUID
@@ -473,6 +543,8 @@ module.exports = {
   getPublicUserProfile,
   updateUserProfile,
   updateUserStatus,
+  updateLastSeen,
+  getUserContacts,
   searchUsers,
   checkUserExists,
   getUserByEmail,
