@@ -1,23 +1,3 @@
-/**
- * User Controller - Avatar Upload Tests
- *
- * Tests for user avatar upload functionality:
- * - PUT /api/users/me/avatar - Upload/update user avatar image
- *
- * Coverage:
- * - Success cases (JPEG, PNG, GIF uploads)
- * - Replacing existing avatars (deletes old file)
- * - File validation (type, size limits)
- * - Maximum file size (5MB)
- * - Invalid file types (PDF, TXT, etc.)
- * - Missing file and wrong field name errors
- * - Authentication requirements
- * - Upload failures and cleanup
- * - Database update failures with rollback
- * - Edge cases (max/min file sizes, special characters in filename)
- * - Old avatar deletion failure handling (should still succeed)
- */
-
 // Mock dependencies FIRST, before any imports
 jest.mock('../../models/User');
 jest.mock('../../services/uploadService', () => ({

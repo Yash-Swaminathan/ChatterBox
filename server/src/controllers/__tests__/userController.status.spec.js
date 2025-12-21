@@ -1,19 +1,3 @@
-/**
- * User Controller - Status Update Tests
- *
- * Tests for user online status management:
- * - PUT /api/users/me/status - Update user's online status
- *
- * Coverage:
- * - Status updates (online, away, busy, offline)
- * - Automatic last_seen timestamp updates
- * - Validation errors (missing status, invalid status, extra fields)
- * - Type validation (status must be string)
- * - Authentication requirements
- * - User not found scenarios
- * - Database errors and model validation errors
- */
-
 const request = require('supertest');
 const app = require('../../app');
 const User = require('../../models/User');

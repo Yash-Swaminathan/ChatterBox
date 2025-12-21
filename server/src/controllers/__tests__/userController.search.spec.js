@@ -1,20 +1,3 @@
-/**
- * User Controller - Search Tests
- *
- * Tests for user search functionality with pagination:
- * - GET /api/users/search?q={query}&limit={n}&offset={n}
- *
- * Coverage:
- * - Search by username and email (case-insensitive)
- * - Pagination parameters (limit, offset, hasMore flag)
- * - Default pagination values (limit=20, offset=0)
- * - Maximum limit cap (50 results)
- * - Query validation (minimum 2 characters, required)
- * - Empty results handling
- * - Security (no sensitive data in search results)
- * - Invalid pagination parameters handling
- */
-
 const request = require('supertest');
 const app = require('../../app');
 const User = require('../../models/User');

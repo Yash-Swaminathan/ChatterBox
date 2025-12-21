@@ -1,4 +1,5 @@
 const { RegExpMatcher, englishDataset, englishRecommendedTransformers } = require('obscenity');
+const { isValidUUID, isInRange, isOneOf } = require('../utils/validators');
 
 // Initialize profanity matcher
 const matcher = new RegExpMatcher({
@@ -208,9 +209,87 @@ function validateStatusUpdate(req, res, next) {
   next();
 }
 
+/**
+ * Validate create direct conversation input
+ *
+ * @param {Object} req - request object
+ * @param {Object} res - response object
+ * @param {Function} next - next middleware function
+ */
+function validateCreateDirectConversation(req, res, next) {
+  const { participantId } = req.body;
+  const errors = [];
+
+  // Check participantId is provided
+  if (!participantId) {
+    errors.push('participantId is required');
+  }
+
+  // Validate UUID format
+  if (participantId && !isValidUUID(participantId)) {
+    errors.push('participantId must be a valid UUID');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: errors[0],
+    });
+  }
+
+  next();
+}
+
+/**
+ * Validate get conversations query parameters
+ *
+ * @param {Object} req - request object
+ * @param {Object} res - response object
+ * @param {Function} next - next middleware function
+ */
+function validateGetConversations(req, res, next) {
+  const { limit, offset, type } = req.query;
+  const errors = [];
+
+  // Validate limit (optional, 1-100)
+  if (limit !== undefined) {
+    const limitNum = parseInt(limit, 10);
+    if (isNaN(limitNum) || !isInRange(limitNum, 1, 100)) {
+      errors.push('limit must be a number between 1 and 100');
+    }
+  }
+
+  // Validate offset (optional, >= 0)
+  if (offset !== undefined) {
+    const offsetNum = parseInt(offset, 10);
+    if (isNaN(offsetNum) || offsetNum < 0) {
+      errors.push('offset must be a non-negative number');
+    }
+  }
+
+  // Validate type (optional, 'direct' or 'group')
+  if (type !== undefined) {
+    const validTypes = ['direct', 'group'];
+    if (!isOneOf(type, validTypes)) {
+      errors.push('type must be either "direct" or "group"');
+    }
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: errors[0],
+    });
+  }
+
+  next();
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
   validateProfileUpdate,
   validateStatusUpdate,
+  validateCreateDirectConversation,
+  validateGetConversations,
 };
