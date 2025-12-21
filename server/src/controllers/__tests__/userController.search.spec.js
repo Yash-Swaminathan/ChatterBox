@@ -12,7 +12,7 @@ jest.mock('../../utils/logger', () => ({
   debug: jest.fn(),
 }));
 jest.mock('express-rate-limit', () => {
-  return jest.fn(() => (_req, _res, next) => next);
+  return jest.fn(() => (_req, _res, next) => next());
 });
 
 describe('User Controller - Search', () => {

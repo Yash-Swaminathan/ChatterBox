@@ -85,29 +85,52 @@ class Conversation {
   }
 
   /**
-   * Get or create a direct conversation (idempotent)
+   * Get or create a direct conversation (idempotent with race condition protection)
+   * Uses PostgreSQL advisory locks to prevent concurrent creation of duplicate conversations
    *
    * @param {string} userId1 - First user's UUID
    * @param {string} userId2 - Second user's UUID
    * @returns {Promise<{conversation: Object, created: boolean}>}
    */
   static async getOrCreateDirect(userId1, userId2) {
-    // Check if conversation already exists
-    const existing = await this.findDirectConversation(userId1, userId2);
+    // Create a deterministic lock ID from the two user IDs (always same order)
+    // This ensures both users trying to create A->B and B->A get the same lock
+    const sortedIds = [userId1, userId2].sort();
+    const lockString = `direct_conv_${sortedIds[0]}_${sortedIds[1]}`;
 
-    if (existing) {
-      logger.info('Existing conversation found', {
-        conversationId: existing.id,
-        userId1,
-        userId2,
-      });
-      return { conversation: existing, created: false };
+    // Convert string to a 32-bit integer for pg_advisory_lock
+    // Use simple hash function (good enough for advisory locks)
+    let hash = 0;
+    for (let i = 0; i < lockString.length; i++) {
+      hash = ((hash << 5) - hash) + lockString.charCodeAt(i);
+      hash = hash & hash; // Convert to 32-bit integer
     }
+    const lockId = Math.abs(hash);
 
-    // Create new conversation
-    const conversation = await this.create('direct', [userId1, userId2]);
+    try {
+      // Acquire advisory lock (blocks until lock is available)
+      await pool.query('SELECT pg_advisory_lock($1)', [lockId]);
 
-    return { conversation, created: true };
+      // Check again if conversation exists (now inside the lock)
+      const existing = await this.findDirectConversation(userId1, userId2);
+
+      if (existing) {
+        logger.info('Existing conversation found', {
+          conversationId: existing.id,
+          userId1,
+          userId2,
+        });
+        return { conversation: existing, created: false };
+      }
+
+      // Create new conversation (protected by lock)
+      const conversation = await this.create('direct', [userId1, userId2]);
+
+      return { conversation, created: true };
+    } finally {
+      // Always release the lock, even if there was an error
+      await pool.query('SELECT pg_advisory_unlock($1)', [lockId]);
+    }
   }
 
   /**

@@ -109,8 +109,10 @@ describe('Conversation Model', () => {
     });
 
     it('should create new conversation if does not exist', async () => {
-      // First query (findDirectConversation) returns nothing
-      pool.query = jest.fn().mockResolvedValueOnce({ rows: [] });
+      pool.query = jest.fn()
+        .mockResolvedValueOnce({ rows: [] }) // pg_advisory_lock
+        .mockResolvedValueOnce({ rows: [] }) // findDirectConversation
+        .mockResolvedValueOnce({ rows: [] }); // pg_advisory_unlock
 
       const mockClient = {
         query: jest
