@@ -1,18 +1,3 @@
-/**
- * User Controller - Profile Management Tests
- *
- * Tests for user profile CRUD operations:
- * - GET /api/users/me - Get current user's profile (authenticated)
- * - PUT /api/users/me - Update profile (display_name, bio, status)
- *
- * Coverage:
- * - Success cases for profile retrieval and updates
- * - Validation errors (empty fields, too long, invalid types)
- * - Authentication errors (missing/invalid tokens)
- * - Database errors and user not found scenarios
- * - Security tests (preventing unauthorized email/password updates)
- */
-
 const request = require('supertest');
 const app = require('../../app');
 const User = require('../../models/User');

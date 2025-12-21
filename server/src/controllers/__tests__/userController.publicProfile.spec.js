@@ -1,18 +1,3 @@
-/**
- * User Controller - Public Profile Tests
- *
- * Tests for public user profile retrieval:
- * - GET /api/users/:userId - Get public user profile by ID
- *
- * Coverage:
- * - Success cases for public profile retrieval
- * - UUID format validation
- * - User not found scenarios
- * - Authentication requirements
- * - Database errors
- * - Ensures sensitive data (email, phone, password) is not exposed
- */
-
 const request = require('supertest');
 const app = require('../../app');
 const User = require('../../models/User');
