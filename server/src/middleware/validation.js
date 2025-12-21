@@ -208,109 +208,81 @@ function validateStatusUpdate(req, res, next) {
   next();
 }
 
-// ============================================================================
-// Week 4 Day 1-2: Conversation Validation
-// ============================================================================
-
 /**
  * Validate create direct conversation input
- * POST /api/conversations/direct
- *
- * INSTRUCTIONS:
- * 1. Extract participantId from req.body
- * 2. Validate participantId is provided
- * 3. Validate participantId is a valid UUID format
- * 4. Use regex: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
- * 5. Return 400 error with details if validation fails
- * 6. Call next() if validation passes
  *
  * @param {Object} req - request object
  * @param {Object} res - response object
  * @param {Function} next - next middleware function
  */
 function validateCreateDirectConversation(req, res, next) {
-  // TODO: Implement validation
-  // const { participantId } = req.body;
-  // const errors = [];
+  const { participantId } = req.body;
+  const errors = [];
 
-  // TODO: Check if participantId is provided
-  // if (!participantId) {
-  //   errors.push('participantId is required');
-  // }
+  // Check participantId is provided
+  if (!participantId) {
+    errors.push('participantId is required');
+  }
 
-  // TODO: Validate UUID format
-  // const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  // if (participantId && !uuidRegex.test(participantId)) {
-  //   errors.push('participantId must be a valid UUID');
-  // }
+  // Validate UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (participantId && !uuidRegex.test(participantId)) {
+    errors.push('participantId must be a valid UUID');
+  }
 
-  // TODO: Return error if validation fails
-  // if (errors.length > 0) {
-  //   return res.status(400).json({
-  //     error: 'Validation Error',
-  //     message: errors[0]
-  //   });
-  // }
+  if (errors.length > 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: errors[0],
+    });
+  }
 
-  // TODO: Call next() if validation passes
-  // next();
+  next();
 }
 
 /**
  * Validate get conversations query parameters
- * GET /api/conversations?limit=20&offset=0&type=direct
- *
- * INSTRUCTIONS:
- * 1. Extract query parameters: limit, offset, type
- * 2. Validate limit: optional, integer, 1-100 (default 20)
- * 3. Validate offset: optional, integer, >= 0 (default 0)
- * 4. Validate type: optional, must be 'direct' or 'group'
- * 5. Return 400 error with details if validation fails
- * 6. Call next() if validation passes
  *
  * @param {Object} req - request object
  * @param {Object} res - response object
  * @param {Function} next - next middleware function
  */
 function validateGetConversations(req, res, next) {
-  // TODO: Implement validation
-  // const { limit, offset, type } = req.query;
-  // const errors = [];
+  const { limit, offset, type } = req.query;
+  const errors = [];
 
-  // TODO: Validate limit (optional, 1-100)
-  // if (limit !== undefined) {
-  //   const limitNum = parseInt(limit, 10);
-  //   if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
-  //     errors.push('limit must be a number between 1 and 100');
-  //   }
-  // }
+  // Validate limit (optional, 1-100)
+  if (limit !== undefined) {
+    const limitNum = parseInt(limit, 10);
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      errors.push('limit must be a number between 1 and 100');
+    }
+  }
 
-  // TODO: Validate offset (optional, >= 0)
-  // if (offset !== undefined) {
-  //   const offsetNum = parseInt(offset, 10);
-  //   if (isNaN(offsetNum) || offsetNum < 0) {
-  //     errors.push('offset must be a non-negative number');
-  //   }
-  // }
+  // Validate offset (optional, >= 0)
+  if (offset !== undefined) {
+    const offsetNum = parseInt(offset, 10);
+    if (isNaN(offsetNum) || offsetNum < 0) {
+      errors.push('offset must be a non-negative number');
+    }
+  }
 
-  // TODO: Validate type (optional, 'direct' or 'group')
-  // if (type !== undefined) {
-  //   const validTypes = ['direct', 'group'];
-  //   if (!validTypes.includes(type)) {
-  //     errors.push('type must be either "direct" or "group"');
-  //   }
-  // }
+  // Validate type (optional, 'direct' or 'group')
+  if (type !== undefined) {
+    const validTypes = ['direct', 'group'];
+    if (!validTypes.includes(type)) {
+      errors.push('type must be either "direct" or "group"');
+    }
+  }
 
-  // TODO: Return error if validation fails
-  // if (errors.length > 0) {
-  //   return res.status(400).json({
-  //     error: 'Validation Error',
-  //     message: errors[0]
-  //   });
-  // }
+  if (errors.length > 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: errors[0],
+    });
+  }
 
-  // TODO: Call next() if validation passes
-  // next();
+  next();
 }
 
 module.exports = {
