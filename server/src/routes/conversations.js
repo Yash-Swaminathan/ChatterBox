@@ -8,13 +8,15 @@ const {
 } = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
 
-const isTest = process.env.NODE_ENV === 'test';
+// More granular control for rate limiting in tests
+// Set SKIP_RATE_LIMIT=true in test environment to bypass rate limiting
+const shouldSkipRateLimit = process.env.SKIP_RATE_LIMIT === 'true';
 
 // Rate limiter for creating conversations
 const createConversationLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 60, // 60 requests per minute
-  skip: () => isTest,
+  skip: () => shouldSkipRateLimit,
   message: 'Too many conversation creation requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
@@ -24,7 +26,7 @@ const createConversationLimiter = rateLimit({
 const getConversationsLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 120, // 120 requests per minute
-  skip: () => isTest,
+  skip: () => shouldSkipRateLimit,
   message: 'Too many requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,

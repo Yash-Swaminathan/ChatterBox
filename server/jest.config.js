@@ -14,4 +14,6 @@ module.exports = {
   clearMocks: true,
   resetMocks: true,
   restoreMocks: true,
+  // Setup files to run before tests
+  setupFiles: ['<rootDir>/jest.setup.js'],
 };

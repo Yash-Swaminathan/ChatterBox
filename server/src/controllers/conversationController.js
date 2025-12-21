@@ -1,6 +1,6 @@
 const Conversation = require('../models/Conversation');
 const User = require('../models/User');
-const { getUserPresence } = require('../services/presenceService');
+const { getBulkPresence } = require('../services/presenceService');
 const logger = require('../utils/logger');
 
 /**
@@ -44,12 +44,14 @@ async function createDirectConversation(req, res) {
       currentUserId
     );
 
-    // Enrich participants with online status from presence system
-    if (fullConversation.participants) {
-      for (const p of fullConversation.participants) {
-        const presence = await getUserPresence(p.userId);
-        p.status = presence?.status || 'offline';
-      }
+    // Enrich participants with online status from presence system (batch lookup)
+    if (fullConversation.participants && fullConversation.participants.length > 0) {
+      const participantIds = fullConversation.participants.map(p => p.userId);
+      const presenceMap = await getBulkPresence(participantIds);
+
+      fullConversation.participants.forEach(p => {
+        p.status = presenceMap[p.userId]?.status || 'offline';
+      });
     }
 
     logger.info('Direct conversation created/retrieved', {
@@ -68,12 +70,22 @@ async function createDirectConversation(req, res) {
       error: error.message,
       stack: error.stack,
       userId: req.user?.userId,
+      participantId: req.body?.participantId,
     });
 
-    return res.status(500).json({
+    // More specific error messages based on error type
+    const errorResponse = {
       error: 'Internal Server Error',
       message: 'Failed to create conversation',
-    });
+    };
+
+    // Add details in development environment for debugging
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = error.message;
+      errorResponse.code = error.code;
+    }
+
+    return res.status(500).json(errorResponse);
   }
 }
 
@@ -100,15 +112,26 @@ async function getUserConversations(req, res) {
       type,
     });
 
-    // Enrich each conversation with participant presence data
-    for (const conv of conversations) {
+    // Enrich each conversation with participant presence data (batch lookup)
+    // Collect all unique participant IDs across all conversations
+    const allParticipantIds = new Set();
+    conversations.forEach(conv => {
       if (conv.participants) {
-        for (const participant of conv.participants) {
-          const presence = await getUserPresence(participant.userId);
-          participant.status = presence?.status || 'offline';
-        }
+        conv.participants.forEach(p => allParticipantIds.add(p.userId));
       }
-    }
+    });
+
+    // Fetch presence for all participants in one batch operation
+    const presenceMap = await getBulkPresence([...allParticipantIds]);
+
+    // Apply presence data to all participants
+    conversations.forEach(conv => {
+      if (conv.participants) {
+        conv.participants.forEach(participant => {
+          participant.status = presenceMap[participant.userId]?.status || 'offline';
+        });
+      }
+    });
 
     logger.info('Conversations retrieved', {
       userId,
@@ -132,12 +155,22 @@ async function getUserConversations(req, res) {
       error: error.message,
       stack: error.stack,
       userId: req.user?.userId,
+      query: req.query,
     });
 
-    return res.status(500).json({
+    // More specific error messages based on error type
+    const errorResponse = {
       error: 'Internal Server Error',
       message: 'Failed to retrieve conversations',
-    });
+    };
+
+    // Add details in development environment for debugging
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = error.message;
+      errorResponse.code = error.code;
+    }
+
+    return res.status(500).json(errorResponse);
   }
 }
 

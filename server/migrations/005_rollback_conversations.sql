@@ -3,7 +3,9 @@
 
 BEGIN;
 
--- Drop indexes
+-- Drop indexes (in reverse order of creation)
+DROP INDEX IF EXISTS idx_unique_direct_conversation;
+DROP INDEX IF EXISTS idx_conv_participants_user_joined;
 DROP INDEX IF EXISTS idx_conversation_participants_conversation_id;
 DROP INDEX IF EXISTS idx_conversation_participants_user_id;
 DROP INDEX IF EXISTS idx_conversations_updated_at;

@@ -1,4 +1,5 @@
 const { RegExpMatcher, englishDataset, englishRecommendedTransformers } = require('obscenity');
+const { isValidUUID, isInRange, isOneOf } = require('../utils/validators');
 
 // Initialize profanity matcher
 const matcher = new RegExpMatcher({
@@ -225,8 +226,7 @@ function validateCreateDirectConversation(req, res, next) {
   }
 
   // Validate UUID format
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (participantId && !uuidRegex.test(participantId)) {
+  if (participantId && !isValidUUID(participantId)) {
     errors.push('participantId must be a valid UUID');
   }
 
@@ -254,7 +254,7 @@ function validateGetConversations(req, res, next) {
   // Validate limit (optional, 1-100)
   if (limit !== undefined) {
     const limitNum = parseInt(limit, 10);
-    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+    if (isNaN(limitNum) || !isInRange(limitNum, 1, 100)) {
       errors.push('limit must be a number between 1 and 100');
     }
   }
@@ -270,7 +270,7 @@ function validateGetConversations(req, res, next) {
   // Validate type (optional, 'direct' or 'group')
   if (type !== undefined) {
     const validTypes = ['direct', 'group'];
-    if (!validTypes.includes(type)) {
+    if (!isOneOf(type, validTypes)) {
       errors.push('type must be either "direct" or "group"');
     }
   }

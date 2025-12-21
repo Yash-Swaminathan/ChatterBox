@@ -38,6 +38,23 @@ CREATE INDEX IF NOT EXISTS idx_conversation_participants_user_id
 CREATE INDEX IF NOT EXISTS idx_conversation_participants_conversation_id
     ON conversation_participants(conversation_id);
 
+-- Composite index for optimized conversation retrieval by user with sorting
+CREATE INDEX IF NOT EXISTS idx_conv_participants_user_joined
+    ON conversation_participants(user_id, joined_at DESC);
+
+-- Unique constraint to prevent duplicate direct conversations (A->B === B->A)
+-- This ensures atomicity and prevents race conditions during concurrent creation
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_direct_conversation
+    ON conversation_participants(
+        LEAST(user_id, (SELECT user_id FROM conversation_participants cp2
+                        WHERE cp2.conversation_id = conversation_participants.conversation_id
+                        AND cp2.user_id != conversation_participants.user_id LIMIT 1)),
+        GREATEST(user_id, (SELECT user_id FROM conversation_participants cp2
+                          WHERE cp2.conversation_id = conversation_participants.conversation_id
+                          AND cp2.user_id != conversation_participants.user_id LIMIT 1))
+    )
+    WHERE conversation_id IN (SELECT id FROM conversations WHERE type = 'direct');
+
 -- Documentation comments
 COMMENT ON TABLE conversation_participants IS 'Tracks which users are in which conversations';
 COMMENT ON COLUMN conversation_participants.is_admin IS 'Group admin flag (Week 9), always FALSE for direct';

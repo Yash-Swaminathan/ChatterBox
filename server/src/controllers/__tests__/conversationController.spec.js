@@ -1,7 +1,7 @@
 jest.mock('../../models/Conversation');
 jest.mock('../../models/User');
 jest.mock('../../services/presenceService', () => ({
-  getUserPresence: jest.fn(),
+  getBulkPresence: jest.fn(),
 }));
 jest.mock('../../utils/logger', () => ({
   info: jest.fn(),
@@ -15,7 +15,7 @@ const app = require('../../app');
 const { generateAccessToken } = require('../../utils/jwt');
 const Conversation = require('../../models/Conversation');
 const User = require('../../models/User');
-const { getUserPresence: presenceServiceGetUserPresence } = require('../../services/presenceService');
+const { getBulkPresence } = require('../../services/presenceService');
 
 describe('Conversation Controller Integration Tests', () => {
   let authToken;
@@ -65,7 +65,7 @@ describe('Conversation Controller Integration Tests', () => {
         ],
       });
 
-      presenceServiceGetUserPresence.mockResolvedValue({ status: 'online' });
+      getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'online' } });
 
       const response = await request(app)
         .post('/api/conversations/direct')
@@ -104,7 +104,7 @@ describe('Conversation Controller Integration Tests', () => {
         ],
       });
 
-      presenceServiceGetUserPresence.mockResolvedValue({ status: 'offline' });
+      getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'offline' } });
 
       const response = await request(app)
         .post('/api/conversations/direct')
@@ -199,7 +199,7 @@ describe('Conversation Controller Integration Tests', () => {
         participants: [{ userId: otherUserId }],
       });
 
-      presenceServiceGetUserPresence.mockResolvedValue({ status: 'online' });
+      getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'online' } });
 
       for (let i = 0; i < 65; i++) {
         const response = await request(app)
@@ -230,7 +230,7 @@ describe('Conversation Controller Integration Tests', () => {
         total: 1,
       });
 
-      presenceServiceGetUserPresence.mockResolvedValue({ status: 'online' });
+      getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'online' } });
 
       const response = await request(app)
         .get('/api/conversations')
@@ -393,9 +393,10 @@ describe('Conversation Controller Integration Tests', () => {
         total: 1,
       });
 
-      presenceServiceGetUserPresence
-        .mockResolvedValueOnce({ status: 'online' })
-        .mockResolvedValueOnce({ status: 'away' });
+      getBulkPresence.mockResolvedValue({
+        'user-1': { status: 'online' },
+        'user-2': { status: 'away' },
+      });
 
       const response = await request(app)
         .get('/api/conversations')
@@ -404,7 +405,8 @@ describe('Conversation Controller Integration Tests', () => {
 
       expect(response.body.conversations[0].participants[0].status).toBe('online');
       expect(response.body.conversations[0].participants[1].status).toBe('away');
-      expect(presenceServiceGetUserPresence).toHaveBeenCalledTimes(2);
+      expect(getBulkPresence).toHaveBeenCalledTimes(1);
+      expect(getBulkPresence).toHaveBeenCalledWith(['user-1', 'user-2']);
     });
   });
 
@@ -428,7 +430,7 @@ describe('Conversation Controller Integration Tests', () => {
         participants: [{ userId: otherUserId }],
       });
 
-      presenceServiceGetUserPresence.mockResolvedValue({ status: 'online' });
+      getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'online' } });
 
       const response1 = await request(app)
         .post('/api/conversations/direct')
@@ -474,7 +476,7 @@ describe('Conversation Controller Integration Tests', () => {
         participants: [{ userId: otherUserId }],
       });
 
-      presenceServiceGetUserPresence.mockResolvedValue({ status: 'online' });
+      getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'online' } });
 
       const [response1, response2] = await Promise.all([
         request(app)
@@ -514,7 +516,7 @@ describe('Conversation Controller Integration Tests', () => {
         ],
       });
 
-      presenceServiceGetUserPresence.mockResolvedValue({ status: 'online' });
+      getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'online' } });
 
       const response = await request(app)
         .post('/api/conversations/direct')
