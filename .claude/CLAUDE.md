@@ -25,65 +25,134 @@
 
 ### **Current Status**
 - **Phase**: PHASE 3 - Enhanced Messaging (Week 4)
-- **Current Task**: Week 4 Day 1-2: Conversation Setup - Ready to begin
+- **Current Task**: Week 4 Day 6-7: Message Retrieval - ⏳ NEXT UP
 - **Week 1 Completion**: 100% ✅
 - **Week 2 Completion**: 100% ✅
 - **Week 3 Completion**: 100% ✅ (All days complete + code review improvements)
-- **Overall Completion**: Weeks 1-3 Complete, Week 4 Starting
-- **Test Status**: 268 tests passing (100% success rate) ✅
+- **Week 4 Day 1-2**: 100% ✅ (Conversation Setup complete)
+- **Week 4 Day 3-5**: 100% ✅ (Message Sending complete)
+- **Overall Completion**: Weeks 1-3 Complete, Week 4 Day 1-5 Complete
+- **Test Status**: 397 tests passing (100% success rate) ✅
 - **Code Quality**: 0 ESLint errors, 0 warnings ✅
+
+**Latest PR (test stability & cleanup)**
+- **Goal**: Stabilize messaging and authentication tests, remove skips, and clean up ESLint warnings.
+- **Key Changes**:
+  - Unskipped and fixed 3 Socket.io message integration tests in `socket.message.spec.js`:
+    - Deliver message back to the sender after auto-join.
+    - Broadcast edited messages to the conversation room.
+    - Broadcast deletions when a message is soft-deleted.
+  - Updated those tests to:
+    - Use valid UUID `messageId` values (the handlers validate UUID format).
+    - Ensure sockets join the `conversation:{conversationId}` room before expecting `message:edited` / `message:deleted` broadcasts.
+    - Use unique user IDs where needed to avoid rate-limiter interference.
+  - Fixed ESLint issues:
+    - Removed unused `testUserId2`/`testToken2` in `socket.message.spec.js`.
+    - Removed unused `result` variables from `Message.spec.js` pagination tests.
+  - Hardened `authController.test.js` setup/teardown:
+    - Cleanup now deletes all `*@example.com` test users and sessions, preventing duplicate-key violations on repeated runs.
+  - Verified full Jest suite is green: **18/18 test suites, 397/397 tests passing.**
 
 ---
 
 ## 🚀 WEEK 4 ROADMAP - Basic Messaging (7 hours)
 
-### **Day 1-2: Conversation Setup (2 hours)** - 🎯 READY TO START
-- [ ] Implement conversations table (id, type, created_at)
-- [ ] Implement conversation_participants table (conversation_id, user_id, joined_at)
-- [ ] Create conversation model with CRUD operations
-- [ ] Create direct conversation endpoint (POST /api/conversations/direct)
-- [ ] Get user conversations endpoint (GET /api/conversations)
-- [ ] Add indexes for efficient queries
-- [ ] Write unit tests for conversation model
-- [ ] Write integration tests for conversation endpoints
+### **Day 1-2: Conversation Setup (2 hours)** - ✅ COMPLETED
+- [x] Implement conversations table (id, type, created_at, updated_at)
+- [x] Implement conversation_participants table (conversation_id, user_id, joined_at, is_admin, last_read_at)
+- [x] Create conversation model with 11 CRUD operations
+- [x] Create direct conversation endpoint (POST /api/conversations/direct)
+- [x] Get user conversations endpoint (GET /api/conversations)
+- [x] Add 4 indexes for efficient queries
+- [x] Write 30+ unit tests for conversation model
+- [x] Write 20+ integration tests for conversation endpoints
+- [x] Implement PostgreSQL advisory locks for race condition protection
 
-**Files to Create:**
-- `server/src/models/Conversation.js` - Conversation model
-- `server/src/routes/conversations.js` - Conversation routes
-- `server/src/controllers/conversationController.js` - Conversation logic
-- `server/migrations/005_create_conversations.sql` - Database migration
-- `server/src/models/__tests__/Conversation.spec.js` - Unit tests
-- `server/src/routes/__tests__/conversations.spec.js` - Integration tests
+**Files Created:**
+- `server/src/models/Conversation.js` - Conversation model with 11 CRUD operations
+- `server/src/routes/conversations.js` - Conversation routes with validation
+- `server/src/controllers/conversationController.js` - Controller with bulk presence lookup
+- `server/migrations/005_create_conversations.sql` - Database migration with indexes
+- `server/migrations/005_create_conversations_rollback.sql` - Rollback migration
+- `server/src/models/__tests__/Conversation.spec.js` - 30+ unit tests
+- `server/src/controllers/__tests__/conversationController.spec.js` - 20+ integration tests
+
+**Files Modified:**
+- `server/src/app.js` - Mounted conversation routes
+- `server/src/middleware/validation.js` - Added conversation validation middleware
+
+**Key Features Implemented:**
+- ✅ PostgreSQL advisory locks prevent duplicate direct conversations
+- ✅ Idempotent conversation creation (returns existing if found)
+- ✅ Bulk presence lookup for all participants (N+1 prevention)
+- ✅ Pagination with limit, offset, type filter
+- ✅ JSON aggregation for efficient participant retrieval
+- ✅ Self-messaging prevention
+- ✅ Non-existent user validation
+- ✅ Rate limiting (60 create/min, 120 list/min)
+
+**Edge Cases Covered:**
+- ⚠️ Race condition: Concurrent conversation creation (advisory locks)
+- ⚠️ Duplicate prevention: Same conversation ID returned for A->B and B->A
+- ⚠️ Self-messaging: Returns 400 error
+- ⚠️ Non-existent user: Returns 404 error
+- ⚠️ Special characters: UTF-8/emoji usernames supported
+- ⚠️ Pagination edge cases: hasMore flag, empty results
 
 **Success Criteria:**
-- [ ] Users can create 1-on-1 conversations
-- [ ] Users can retrieve their conversation list
-- [ ] Database indexes applied for performance
-- [ ] All tests passing
-- [ ] API documentation updated
+- [x] Users can create 1-on-1 conversations
+- [x] Users can retrieve their conversation list with pagination
+- [x] Database indexes applied for performance
+- [x] All 50+ tests passing (model + integration)
+- [x] Rate limiting implemented
+
+**Pull Request:** [PR #13](https://github.com/Yash-Swaminathan/ChatterBox/pull/13) - Week 4 Day 1-2: Conversation Setup
 
 ---
 
-### **Day 3-5: Message Sending (3 hours)** - ⏳ PENDING
-- [ ] Implement messages table (id, conversation_id, sender_id, content, created_at, updated_at, deleted_at)
-- [ ] Create message model with CRUD operations
-- [ ] Socket event: `message:send` (handle incoming messages)
-- [ ] Save message to database
-- [ ] Emit `message:new` to all conversation participants
-- [ ] Implement optimistic updates with tempId
-- [ ] Message validation (max length, non-empty)
-- [ ] Rate limiting for message sending
-- [ ] Write unit tests for message model
-- [ ] Write integration tests for message Socket.io events
+### **Day 3-5: Message Sending (3 hours)** - ✅ COMPLETED
+- [x] Implement messages table (id, conversation_id, sender_id, content, created_at, updated_at, deleted_at)
+- [x] Create message model with CRUD operations
+- [x] Socket event: `message:send` (handle incoming messages)
+- [x] Socket event: `message:edit` (edit existing messages)
+- [x] Socket event: `message:delete` (soft delete messages)
+- [x] Save message to database
+- [x] Emit `message:new` to all conversation participants
+- [x] Implement optimistic updates with tempId
+- [x] Message validation (max length 10000, non-empty, trim whitespace)
+- [x] Rate limiting for message sending (30/min, 5 burst/sec)
+- [x] Write unit tests for message model
+- [x] Write integration tests for message Socket.io events
 
-**Files to Create:**
-- `server/src/models/Message.js` - Message model
-- `server/src/socket/handlers/messageHandler.js` - Message Socket.io events
-- `server/migrations/006_create_messages.sql` - Database migration
-- `server/src/models/__tests__/Message.spec.js` - Unit tests
-- `server/src/socket/__tests__/socket.message.spec.js` - Integration tests
+**📋 Implementation Plan**: See [week4-day3-5-plan.md](.claude/week4-day3-5-plan.md) for:
+- Complete database schema with indexes
+- 6 categories of edge cases with handling strategies
+- Rate limiting strategy (window + burst limits)
+- Comprehensive testing strategy
+- Socket event flows and payloads
 
-**Socket Events:**
+**Files Created:**
+- `server/src/models/Message.js` - Message model with 11 CRUD operations
+- `server/src/socket/handlers/messageHandler.js` - Message Socket.io event handlers
+- `server/migrations/006_create_messages.sql` - Database migration with 4 indexes
+- `server/migrations/006_create_messages_rollback.sql` - Rollback migration
+- `server/src/models/__tests__/Message.spec.js` - 52 unit tests
+- `server/src/socket/__tests__/socket.message.spec.js` - 28 integration tests
+
+**Files Modified:**
+- `server/src/socket/index.js` - Registered message handlers
+
+**Key Features Implemented:**
+- ✅ Message CRUD: create, findById, findByConversation, update, softDelete, hardDelete
+- ✅ Ownership validation: isOwner, getConversationId
+- ✅ Utility methods: countByConversation, getLatest, exists
+- ✅ Rate limiting: 30 messages/minute window + 5 messages/second burst
+- ✅ Optimistic updates with tempId for client-side matching
+- ✅ Auto-join conversation room on first message
+- ✅ Cursor-based pagination with configurable limit
+- ✅ Soft delete support (preserves message history)
+
+**Socket Events Implemented:**
 ```javascript
 // Client sends
 socket.emit('message:send', {
@@ -101,15 +170,35 @@ io.to(`conversation:${conversationId}`).emit('message:new', {
   tempId: 'temp-uuid-456',
   createdAt: '2025-01-15T10:30:00Z'
 });
+
+// Server confirms to sender
+socket.emit('message:sent', {
+  tempId: 'temp-uuid-456',
+  messageId: 'msg-789',
+  createdAt: '2025-01-15T10:30:00Z'
+});
 ```
 
+**Edge Cases Covered:**
+- ✅ Empty/whitespace-only content - Returns CONTENT_EMPTY error
+- ✅ Content exceeding 10000 characters - Returns CONTENT_TOO_LONG error
+- ✅ User not participant in conversation - Returns NOT_PARTICIPANT error
+- ✅ Rate limiting (30 msgs/min, 5 burst/sec) - Returns RATE_LIMITED error
+- ✅ Invalid conversation ID format - Returns INVALID_INPUT error
+- ✅ Unicode/emoji content - Full support tested
+- ✅ RTL text support - Tested with Arabic text
+- ✅ Database failures mid-send - Returns DATABASE_ERROR with tempId
+- ✅ Non-owner edit/delete attempts - Returns NOT_OWNER error
+- ✅ Missing required fields - Returns INVALID_INPUT error
+
 **Success Criteria:**
-- [ ] Messages sent via Socket.io are saved to database
-- [ ] All conversation participants receive new messages in real-time
-- [ ] Optimistic updates work (tempId matching)
-- [ ] Message validation prevents empty/oversized messages
-- [ ] Rate limiting prevents spam
-- [ ] All tests passing
+- [x] Messages sent via Socket.io are saved to database
+- [x] All conversation participants receive new messages in real-time
+- [x] Optimistic updates work (tempId matching)
+- [x] Message validation prevents empty/oversized messages
+- [x] Rate limiting prevents spam (30/min, 5 burst/sec)
+- [x] Edit and delete operations work
+- [x] All 80 tests passing (52 model + 28 integration)
 
 ---
 
