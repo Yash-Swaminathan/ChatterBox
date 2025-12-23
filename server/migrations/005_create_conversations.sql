@@ -1,6 +1,3 @@
--- Migration: Create conversations tables
--- Week 4 Day 1-2: Conversation Setup
-
 BEGIN;
 
 -- Create conversations table

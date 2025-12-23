@@ -1,6 +1,3 @@
--- Rollback Migration: Drop conversations tables
--- Week 4 Day 1-2: Conversation Setup Rollback
-
 BEGIN;
 
 -- Drop indexes (in reverse order of creation)

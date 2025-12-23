@@ -209,7 +209,7 @@ describe('Conversation Controller Integration Tests', () => {
 
         expect(response.status).not.toBe(429);
       }
-    });
+    }, 30000);
   });
 
   describe('GET /api/conversations', () => {

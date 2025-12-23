@@ -39,11 +39,7 @@ async function setUserOnline(userId, socketId) {
       socketId,
     };
 
-    await redisClient.setEx(
-      `presence:${userId}`,
-      PRESENCE_TTL,
-      JSON.stringify(presence)
-    );
+    await redisClient.setEx(`presence:${userId}`, PRESENCE_TTL, JSON.stringify(presence));
 
     await redisClient.sAdd(`user:sockets:${userId}`, socketId);
 
@@ -78,11 +74,7 @@ async function setUserOffline(userId, socketId) {
         timestamp: new Date().toISOString(),
       };
 
-      await redisClient.setEx(
-        `presence:${userId}`,
-        PRESENCE_TTL,
-        JSON.stringify(presence)
-      );
+      await redisClient.setEx(`presence:${userId}`, PRESENCE_TTL, JSON.stringify(presence));
 
       logger.info('User set to offline (last socket)', { userId });
       return true;
@@ -128,11 +120,7 @@ async function updateUserStatus(userId, status) {
       timestamp: new Date().toISOString(),
     };
 
-    await redisClient.setEx(
-      `presence:${userId}`,
-      PRESENCE_TTL,
-      JSON.stringify(presence)
-    );
+    await redisClient.setEx(`presence:${userId}`, PRESENCE_TTL, JSON.stringify(presence));
 
     logger.info('User status updated', { userId, status });
     return presence;
@@ -212,10 +200,7 @@ async function getBulkPresence(userIds) {
  */
 async function refreshHeartbeat(userId, socketId) {
   try {
-    const isMember = await redisClient.sIsMember(
-      `user:sockets:${userId}`,
-      socketId
-    );
+    const isMember = await redisClient.sIsMember(`user:sockets:${userId}`, socketId);
 
     if (!isMember) {
       logger.warn('Heartbeat for non-existent socket', { userId, socketId });

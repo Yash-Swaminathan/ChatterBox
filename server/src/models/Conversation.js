@@ -102,7 +102,7 @@ class Conversation {
     // Use simple hash function (good enough for advisory locks)
     let hash = 0;
     for (let i = 0; i < lockString.length; i++) {
-      hash = ((hash << 5) - hash) + lockString.charCodeAt(i);
+      hash = (hash << 5) - hash + lockString.charCodeAt(i);
       hash = hash & hash; // Convert to 32-bit integer
     }
     const lockId = Math.abs(hash);
@@ -335,7 +335,7 @@ class Conversation {
       [conversationId]
     );
 
-    return result.rows.map((row) => row.user_id);
+    return result.rows.map(row => row.user_id);
   }
 
   /**
@@ -345,10 +345,7 @@ class Conversation {
    * @returns {Promise<boolean>} True if deleted
    */
   static async delete(conversationId) {
-    const result = await pool.query(
-      'DELETE FROM conversations WHERE id = $1',
-      [conversationId]
-    );
+    const result = await pool.query('DELETE FROM conversations WHERE id = $1', [conversationId]);
 
     logger.info('Conversation deleted', {
       conversationId,
