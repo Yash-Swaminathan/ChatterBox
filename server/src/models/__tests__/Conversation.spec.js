@@ -109,7 +109,8 @@ describe('Conversation Model', () => {
     });
 
     it('should create new conversation if does not exist', async () => {
-      pool.query = jest.fn()
+      pool.query = jest
+        .fn()
         .mockResolvedValueOnce({ rows: [] }) // pg_advisory_lock
         .mockResolvedValueOnce({ rows: [] }) // findDirectConversation
         .mockResolvedValueOnce({ rows: [] }); // pg_advisory_unlock
@@ -314,10 +315,9 @@ describe('Conversation Model', () => {
 
       await Conversation.touch('conv-123');
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE conversations'),
-        ['conv-123']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE conversations'), [
+        'conv-123',
+      ]);
     });
   });
 

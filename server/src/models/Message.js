@@ -1,7 +1,6 @@
 const { pool } = require('../config/database');
 const logger = require('../utils/logger');
 
-
 class Message {
   static MAX_CONTENT_LENGTH = 10000;
 
@@ -257,10 +256,10 @@ class Message {
    * @returns {Promise<boolean>} True if user is the sender
    */
   static async isOwner(messageId, userId) {
-    const result = await pool.query(
-      'SELECT 1 FROM messages WHERE id = $1 AND sender_id = $2',
-      [messageId, userId]
-    );
+    const result = await pool.query('SELECT 1 FROM messages WHERE id = $1 AND sender_id = $2', [
+      messageId,
+      userId,
+    ]);
 
     return result.rows.length > 0;
   }
@@ -316,10 +315,9 @@ class Message {
    * @returns {Promise<boolean>} True if message exists and is not deleted
    */
   static async exists(messageId) {
-    const result = await pool.query(
-      'SELECT 1 FROM messages WHERE id = $1 AND deleted_at IS NULL',
-      [messageId]
-    );
+    const result = await pool.query('SELECT 1 FROM messages WHERE id = $1 AND deleted_at IS NULL', [
+      messageId,
+    ]);
 
     return result.rows.length > 0;
   }
@@ -331,10 +329,9 @@ class Message {
    * @returns {Promise<string|null>} Conversation ID or null if message not found
    */
   static async getConversationId(messageId) {
-    const result = await pool.query(
-      'SELECT conversation_id FROM messages WHERE id = $1',
-      [messageId]
-    );
+    const result = await pool.query('SELECT conversation_id FROM messages WHERE id = $1', [
+      messageId,
+    ]);
 
     return result.rows[0]?.conversation_id || null;
   }

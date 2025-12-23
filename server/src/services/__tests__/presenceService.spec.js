@@ -302,11 +302,13 @@ describe('presenceService', () => {
   describe('getOnlineContacts', () => {
     it('should return online contacts only', async () => {
       redisClient.get = jest.fn().mockResolvedValue(JSON.stringify(['user-2', 'user-3', 'user-4']));
-      redisClient.mGet = jest.fn().mockResolvedValue([
-        JSON.stringify({ status: 'online', timestamp: '2025-01-01T00:00:00Z' }),
-        JSON.stringify({ status: 'offline', timestamp: '2025-01-01T00:00:00Z' }),
-        JSON.stringify({ status: 'away', timestamp: '2025-01-01T00:00:00Z' }),
-      ]);
+      redisClient.mGet = jest
+        .fn()
+        .mockResolvedValue([
+          JSON.stringify({ status: 'online', timestamp: '2025-01-01T00:00:00Z' }),
+          JSON.stringify({ status: 'offline', timestamp: '2025-01-01T00:00:00Z' }),
+          JSON.stringify({ status: 'away', timestamp: '2025-01-01T00:00:00Z' }),
+        ]);
 
       const result = await presenceService.getOnlineContacts('user-1');
 

@@ -123,7 +123,10 @@ function checkRateLimit(userId) {
  */
 function validateMessageSend(data) {
   if (!data || typeof data !== 'object') {
-    return { valid: false, error: { code: ERROR_CODES.INVALID_INPUT, message: 'Invalid request data' } };
+    return {
+      valid: false,
+      error: { code: ERROR_CODES.INVALID_INPUT, message: 'Invalid request data' },
+    };
   }
 
   const { conversationId, content } = data;
@@ -165,7 +168,10 @@ function validateMessageSend(data) {
  */
 function validateMessageEdit(data) {
   if (!data || typeof data !== 'object') {
-    return { valid: false, error: { code: ERROR_CODES.INVALID_INPUT, message: 'Invalid request data' } };
+    return {
+      valid: false,
+      error: { code: ERROR_CODES.INVALID_INPUT, message: 'Invalid request data' },
+    };
   }
 
   const { messageId, content } = data;
@@ -207,7 +213,10 @@ function validateMessageEdit(data) {
  */
 function validateMessageDelete(data) {
   if (!data || typeof data !== 'object') {
-    return { valid: false, error: { code: ERROR_CODES.INVALID_INPUT, message: 'Invalid request data' } };
+    return {
+      valid: false,
+      error: { code: ERROR_CODES.INVALID_INPUT, message: 'Invalid request data' },
+    };
   }
 
   const { messageId } = data;
@@ -558,11 +567,11 @@ function handleConversationLeave(socket, data) {
  * @param {Object} socket - Socket instance
  */
 function registerMessageHandlers(io, socket) {
-  socket.on('message:send', (data) => handleMessageSend(io, socket, data));
-  socket.on('message:edit', (data) => handleMessageEdit(io, socket, data));
-  socket.on('message:delete', (data) => handleMessageDelete(io, socket, data));
-  socket.on('conversation:join', (data) => handleConversationJoin(socket, data));
-  socket.on('conversation:leave', (data) => handleConversationLeave(socket, data));
+  socket.on('message:send', data => handleMessageSend(io, socket, data));
+  socket.on('message:edit', data => handleMessageEdit(io, socket, data));
+  socket.on('message:delete', data => handleMessageDelete(io, socket, data));
+  socket.on('conversation:join', data => handleConversationJoin(socket, data));
+  socket.on('conversation:leave', data => handleConversationLeave(socket, data));
 }
 
 module.exports = {

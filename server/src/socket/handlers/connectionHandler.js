@@ -300,10 +300,7 @@ function startStaleConnectionCleanup(io) {
         cleanedConnections,
         cleanedUsers,
         remainingUsers: userSockets.size,
-        totalSockets: Array.from(userSockets.values()).reduce(
-          (acc, set) => acc + set.size,
-          0
-        ),
+        totalSockets: Array.from(userSockets.values()).reduce((acc, set) => acc + set.size, 0),
       });
     }
   }, CLEANUP_INTERVAL);

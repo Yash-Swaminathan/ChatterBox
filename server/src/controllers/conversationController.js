@@ -39,10 +39,7 @@ async function createDirectConversation(req, res) {
     );
 
     // Fetch full conversation details with participants
-    const fullConversation = await Conversation.findById(
-      conversation.id,
-      currentUserId
-    );
+    const fullConversation = await Conversation.findById(conversation.id, currentUserId);
 
     // Enrich participants with online status from presence system (batch lookup)
     if (fullConversation.participants && fullConversation.participants.length > 0) {
