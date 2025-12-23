@@ -10,10 +10,14 @@ const RATE_LIMIT = {
   BURST_WINDOW_MS: 1000, // 1 second burst window
   PENALTY_DURATION_MS: 30000, // 30 second penalty for exceeding limit
   CLEANUP_INTERVAL_MS: 3600000, // Cleanup old entries every hour
+  MAX_ENTRIES: 10000, // Maximum rate limiter entries to prevent memory exhaustion
 };
 
 // In-memory rate limiter (TODO: Move to Redis for horizontal scaling)
 const rateLimiter = new Map();
+
+// Cleanup interval reference for lifecycle control
+let cleanupIntervalId = null;
 
 // Error codes for message events
 const ERROR_CODES = {
@@ -29,8 +33,10 @@ const ERROR_CODES = {
   DATABASE_ERROR: 'DATABASE_ERROR',
 };
 
-// Periodic cleanup of rate limit entries to prevent memory leak
-setInterval(() => {
+/**
+ * Perform cleanup of stale rate limit entries
+ */
+function performRateLimitCleanup() {
   const now = Date.now();
   for (const [userId, entry] of rateLimiter.entries()) {
     // Remove entries where window has expired and no penalty active
@@ -42,7 +48,41 @@ setInterval(() => {
     }
   }
   logger.debug('Rate limiter cleanup', { remainingEntries: rateLimiter.size });
-}, RATE_LIMIT.CLEANUP_INTERVAL_MS);
+}
+
+/**
+ * Start the periodic cleanup interval for rate limiter
+ * Call this when initializing the socket server
+ */
+function startCleanup() {
+  if (cleanupIntervalId) {
+    return; // Already running
+  }
+  cleanupIntervalId = setInterval(performRateLimitCleanup, RATE_LIMIT.CLEANUP_INTERVAL_MS);
+  logger.info('Rate limiter cleanup started');
+}
+
+/**
+ * Stop the periodic cleanup interval
+ * Call this during graceful shutdown or in tests
+ */
+function stopCleanup() {
+  if (cleanupIntervalId) {
+    clearInterval(cleanupIntervalId);
+    cleanupIntervalId = null;
+    logger.info('Rate limiter cleanup stopped');
+  }
+}
+
+/**
+ * Clear all rate limiter entries (useful for testing)
+ */
+function clearRateLimiter() {
+  rateLimiter.clear();
+}
+
+// Auto-start cleanup on module load (can be stopped with stopCleanup())
+startCleanup();
 
 /**
  * Create a new rate limit entry for a user
@@ -69,6 +109,17 @@ function checkRateLimit(userId) {
   let entry = rateLimiter.get(userId);
 
   if (!entry) {
+    // Check max entries to prevent memory exhaustion
+    if (rateLimiter.size >= RATE_LIMIT.MAX_ENTRIES) {
+      // Force cleanup before adding new entry
+      performRateLimitCleanup();
+
+      // If still at max, reject new users temporarily
+      if (rateLimiter.size >= RATE_LIMIT.MAX_ENTRIES) {
+        logger.warn('Rate limiter at max capacity', { size: rateLimiter.size });
+        return { allowed: false, retryAfter: 5000 };
+      }
+    }
     entry = createRateLimitEntry(now);
     rateLimiter.set(userId, entry);
   }
@@ -357,9 +408,27 @@ async function handleMessageEdit(io, socket, data) {
 
     const { messageId, content } = data;
 
-    // Check if user is the owner of the message
-    const isOwner = await Message.isOwner(messageId, userId);
-    if (!isOwner) {
+    // Atomically check existence, deletion status, and ownership in a single query
+    // This prevents race conditions between separate checks
+    const msgInfo = await Message.getMessageEditInfo(messageId, userId);
+
+    if (!msgInfo.exists) {
+      socket.emit('message:error', {
+        code: ERROR_CODES.MESSAGE_NOT_FOUND,
+        message: 'Message not found',
+      });
+      return;
+    }
+
+    if (msgInfo.isDeleted) {
+      socket.emit('message:error', {
+        code: ERROR_CODES.MESSAGE_NOT_FOUND,
+        message: 'Message not found or already deleted',
+      });
+      return;
+    }
+
+    if (!msgInfo.isOwner) {
       socket.emit('message:error', {
         code: ERROR_CODES.NOT_OWNER,
         message: 'You can only edit your own messages',
@@ -367,15 +436,7 @@ async function handleMessageEdit(io, socket, data) {
       return;
     }
 
-    // Get conversation ID before update
-    const conversationId = await Message.getConversationId(messageId);
-    if (!conversationId) {
-      socket.emit('message:error', {
-        code: ERROR_CODES.MESSAGE_NOT_FOUND,
-        message: 'Message not found',
-      });
-      return;
-    }
+    const conversationId = msgInfo.conversationId;
 
     // Update the message
     const updatedMessage = await Message.update(messageId, content);
@@ -435,9 +496,27 @@ async function handleMessageDelete(io, socket, data) {
 
     const { messageId } = data;
 
-    // Check if user is the owner of the message
-    const isOwner = await Message.isOwner(messageId, userId);
-    if (!isOwner) {
+    // Atomically check existence, deletion status, and ownership in a single query
+    // This prevents race conditions between separate checks
+    const msgInfo = await Message.getMessageEditInfo(messageId, userId);
+
+    if (!msgInfo.exists) {
+      socket.emit('message:error', {
+        code: ERROR_CODES.MESSAGE_NOT_FOUND,
+        message: 'Message not found',
+      });
+      return;
+    }
+
+    if (msgInfo.isDeleted) {
+      socket.emit('message:error', {
+        code: ERROR_CODES.MESSAGE_NOT_FOUND,
+        message: 'Message not found or already deleted',
+      });
+      return;
+    }
+
+    if (!msgInfo.isOwner) {
       socket.emit('message:error', {
         code: ERROR_CODES.NOT_OWNER,
         message: 'You can only delete your own messages',
@@ -445,15 +524,7 @@ async function handleMessageDelete(io, socket, data) {
       return;
     }
 
-    // Get conversation ID before delete
-    const conversationId = await Message.getConversationId(messageId);
-    if (!conversationId) {
-      socket.emit('message:error', {
-        code: ERROR_CODES.MESSAGE_NOT_FOUND,
-        message: 'Message not found',
-      });
-      return;
-    }
+    const conversationId = msgInfo.conversationId;
 
     // Soft delete the message
     const deleted = await Message.softDelete(messageId);
@@ -581,6 +652,10 @@ module.exports = {
   handleMessageDelete,
   handleConversationJoin,
   handleConversationLeave,
+  // Lifecycle control for rate limiter cleanup
+  startCleanup,
+  stopCleanup,
+  clearRateLimiter,
   // Exported for testing
   checkRateLimit,
   validateMessageSend,

@@ -11,6 +11,8 @@ jest.mock('../../models/Message', () => ({
   softDelete: jest.fn(),
   isOwner: jest.fn(),
   getConversationId: jest.fn(),
+  exists: jest.fn(),
+  getMessageEditInfo: jest.fn(),
   MAX_CONTENT_LENGTH: 10000,
 }));
 
@@ -99,6 +101,10 @@ describe('Socket.io Message Integration Tests', () => {
   });
 
   afterAll(done => {
+    // Stop the rate limiter cleanup interval to prevent Jest worker from hanging
+    const { stopCleanup } = require('../handlers/messageHandler');
+    stopCleanup();
+
     io.close();
     httpServer.close();
     done();
@@ -126,6 +132,13 @@ describe('Socket.io Message Integration Tests', () => {
     Message.softDelete.mockResolvedValue(true);
     Message.isOwner.mockResolvedValue(true);
     Message.getConversationId.mockResolvedValue(testConversationId);
+    Message.exists.mockResolvedValue(true);
+    Message.getMessageEditInfo.mockResolvedValue({
+      exists: true,
+      isDeleted: false,
+      isOwner: true,
+      conversationId: testConversationId,
+    });
 
     Conversation.isParticipant.mockResolvedValue(true);
     Conversation.touch.mockResolvedValue(undefined);
@@ -401,9 +414,13 @@ describe('Socket.io Message Integration Tests', () => {
     const testMessageId = '550e8400-e29b-41d4-a716-446655440099';
 
     it('should update message and broadcast edit', async () => {
-      // Reset mocks for this specific test
-      Message.isOwner.mockResolvedValue(true);
-      Message.getConversationId.mockResolvedValue(testConversationId);
+      // Reset mocks for this specific test - use atomic getMessageEditInfo
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: true,
+        isDeleted: false,
+        isOwner: true,
+        conversationId: testConversationId,
+      });
       Message.validateContent.mockReturnValue(null);
       Message.update.mockResolvedValue({
         id: testMessageId,
@@ -435,10 +452,14 @@ describe('Socket.io Message Integration Tests', () => {
     });
 
     it('should verify ownership before editing', async () => {
-      // Setup mocks BEFORE connecting
+      // Setup mocks BEFORE connecting - use atomic getMessageEditInfo
       Message.validateContent.mockReturnValue(null);
-      Message.isOwner.mockResolvedValue(true);
-      Message.getConversationId.mockResolvedValue(testConversationId);
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: true,
+        isDeleted: false,
+        isOwner: true,
+        conversationId: testConversationId,
+      });
       Message.update.mockResolvedValue({
         id: 'msg-edit-test',
         content: 'Updated message',
@@ -461,13 +482,18 @@ describe('Socket.io Message Integration Tests', () => {
       // Wait a bit for the handler to execute
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      expect(Message.isOwner).toHaveBeenCalled();
+      expect(Message.getMessageEditInfo).toHaveBeenCalled();
     });
 
     it('should only allow owner to edit', async () => {
-      // Reset to default and then override
+      // Reset to default and then override - message exists but user is not owner
       Message.validateContent.mockReturnValue(null);
-      Message.isOwner.mockResolvedValue(false);
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: true,
+        isDeleted: false,
+        isOwner: false,
+        conversationId: testConversationId,
+      });
 
       clientSocket = createClient(testToken);
       await waitForConnection(clientSocket);
@@ -505,8 +531,12 @@ describe('Socket.io Message Integration Tests', () => {
 
     it('should reject edit of non-existent message', async () => {
       Message.validateContent.mockReturnValue(null);
-      Message.isOwner.mockResolvedValue(true);
-      Message.getConversationId.mockResolvedValue(null);
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: false,
+        isDeleted: false,
+        isOwner: false,
+        conversationId: null,
+      });
 
       clientSocket = createClient(testToken);
       await waitForConnection(clientSocket);
@@ -528,9 +558,13 @@ describe('Socket.io Message Integration Tests', () => {
     const testMessageId = '550e8400-e29b-41d4-a716-446655440098';
 
     it('should soft delete and broadcast deletion', async () => {
-      // Reset mocks for this specific test
-      Message.isOwner.mockResolvedValue(true);
-      Message.getConversationId.mockResolvedValue(testConversationId);
+      // Reset mocks for this specific test - use atomic getMessageEditInfo
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: true,
+        isDeleted: false,
+        isOwner: true,
+        conversationId: testConversationId,
+      });
       Message.softDelete.mockResolvedValue(true);
 
       clientSocket = createClient(testToken);
@@ -555,9 +589,13 @@ describe('Socket.io Message Integration Tests', () => {
     });
 
     it('should verify ownership before deleting', async () => {
-      // Setup mocks BEFORE connecting
-      Message.isOwner.mockResolvedValue(true);
-      Message.getConversationId.mockResolvedValue(testConversationId);
+      // Setup mocks BEFORE connecting - use atomic getMessageEditInfo
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: true,
+        isDeleted: false,
+        isOwner: true,
+        conversationId: testConversationId,
+      });
       Message.softDelete.mockResolvedValue(true);
 
       clientSocket = createClient(testToken);
@@ -575,11 +613,17 @@ describe('Socket.io Message Integration Tests', () => {
       // Wait a bit for the handler to execute
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      expect(Message.isOwner).toHaveBeenCalled();
+      expect(Message.getMessageEditInfo).toHaveBeenCalled();
     });
 
     it('should only allow owner to delete', async () => {
-      Message.isOwner.mockResolvedValue(false);
+      // Message exists but user is not owner
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: true,
+        isDeleted: false,
+        isOwner: false,
+        conversationId: testConversationId,
+      });
 
       clientSocket = createClient(testToken);
       await waitForConnection(clientSocket);
@@ -597,8 +641,13 @@ describe('Socket.io Message Integration Tests', () => {
     });
 
     it('should reject delete of non-existent message', async () => {
-      Message.isOwner.mockResolvedValue(true);
-      Message.getConversationId.mockResolvedValue(null);
+      // Message does not exist
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: false,
+        isDeleted: false,
+        isOwner: false,
+        conversationId: null,
+      });
 
       clientSocket = createClient(testToken);
       await waitForConnection(clientSocket);
@@ -615,9 +664,13 @@ describe('Socket.io Message Integration Tests', () => {
     });
 
     it('should handle already deleted message', async () => {
-      Message.isOwner.mockResolvedValue(true);
-      Message.getConversationId.mockResolvedValue(testConversationId);
-      Message.softDelete.mockResolvedValue(false); // Already deleted
+      // Message exists but is already deleted
+      Message.getMessageEditInfo.mockResolvedValue({
+        exists: true,
+        isDeleted: true,
+        isOwner: true,
+        conversationId: testConversationId,
+      });
 
       clientSocket = createClient(testToken);
       await waitForConnection(clientSocket);

@@ -67,7 +67,8 @@ class Message {
       return 'Content cannot be empty';
     }
 
-    if (content.length > this.MAX_CONTENT_LENGTH) {
+    // Validate on trimmed length for consistency (content is trimmed before saving)
+    if (trimmed.length > this.MAX_CONTENT_LENGTH) {
       return `Content exceeds maximum length of ${this.MAX_CONTENT_LENGTH} characters`;
     }
 
@@ -334,6 +335,44 @@ class Message {
     ]);
 
     return result.rows[0]?.conversation_id || null;
+  }
+
+  /**
+   * Atomically get message info for edit/delete operations
+   * Returns existence status, ownership, and conversation ID in a single query
+   * to prevent race conditions between checks
+   *
+   * @param {string} messageId - Message UUID
+   * @param {string} userId - User UUID to check ownership
+   * @returns {Promise<{exists: boolean, isDeleted: boolean, isOwner: boolean, conversationId: string|null}>}
+   */
+  static async getMessageEditInfo(messageId, userId) {
+    const result = await pool.query(
+      `SELECT
+        conversation_id,
+        sender_id,
+        deleted_at
+      FROM messages
+      WHERE id = $1`,
+      [messageId]
+    );
+
+    if (result.rows.length === 0) {
+      return {
+        exists: false,
+        isDeleted: false,
+        isOwner: false,
+        conversationId: null,
+      };
+    }
+
+    const row = result.rows[0];
+    return {
+      exists: true,
+      isDeleted: row.deleted_at !== null,
+      isOwner: row.sender_id === userId,
+      conversationId: row.conversation_id,
+    };
   }
 }
 
