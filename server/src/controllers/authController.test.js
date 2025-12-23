@@ -24,11 +24,11 @@ let userId;
 // Clean up function to delete test users
 async function cleanupTestUsers() {
   try {
+    // Clean up all test users including security tests and samepass tests
     await query(
-      'DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)',
-      ['test%@example.com']
+      "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com')"
     );
-    await query('DELETE FROM users WHERE email LIKE $1', ['test%@example.com']);
+    await query("DELETE FROM users WHERE email LIKE '%@example.com'");
   } catch (error) {
     console.error('Error cleaning up test users:', error);
   }
