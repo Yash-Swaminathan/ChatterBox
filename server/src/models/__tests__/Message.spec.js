@@ -87,10 +87,11 @@ describe('Message Model', () => {
       expect(result.id).toBe('msg-123');
       expect(result.content).toBe('Hello world');
       expect(result.sender.username).toBe('testuser');
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO messages'),
-        ['conv-123', 'user-123', 'Hello world']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO messages'), [
+        'conv-123',
+        'user-123',
+        'Hello world',
+      ]);
     });
 
     it('should trim whitespace from content', async () => {
@@ -101,10 +102,11 @@ describe('Message Model', () => {
 
       await Message.create('conv-123', 'user-123', '  Hello world  ');
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO messages'),
-        ['conv-123', 'user-123', 'Hello world']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO messages'), [
+        'conv-123',
+        'user-123',
+        'Hello world',
+      ]);
     });
 
     it('should reject empty content', async () => {
@@ -319,10 +321,10 @@ describe('Message Model', () => {
       const result = await Message.update('msg-123', 'Updated content');
 
       expect(result.content).toBe('Updated content');
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE messages'),
-        ['Updated content', 'msg-123']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE messages'), [
+        'Updated content',
+        'msg-123',
+      ]);
     });
 
     it('should trim updated content', async () => {
@@ -333,10 +335,7 @@ describe('Message Model', () => {
 
       await Message.update('msg-123', '  Updated content  ');
 
-      expect(pool.query).toHaveBeenCalledWith(expect.any(String), [
-        'Updated content',
-        'msg-123',
-      ]);
+      expect(pool.query).toHaveBeenCalledWith(expect.any(String), ['Updated content', 'msg-123']);
     });
 
     it('should return null for non-existent message', async () => {
@@ -387,10 +386,9 @@ describe('Message Model', () => {
       const result = await Message.softDelete('msg-123');
 
       expect(result).toBe(false);
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('deleted_at IS NULL'),
-        ['msg-123']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('deleted_at IS NULL'), [
+        'msg-123',
+      ]);
     });
   });
 
@@ -420,10 +418,10 @@ describe('Message Model', () => {
       const result = await Message.isOwner('msg-123', 'user-123');
 
       expect(result).toBe(true);
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('sender_id = $2'),
-        ['msg-123', 'user-123']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('sender_id = $2'), [
+        'msg-123',
+        'user-123',
+      ]);
     });
 
     it('should return false for non-owner', async () => {
@@ -457,10 +455,9 @@ describe('Message Model', () => {
 
       await Message.countByConversation('conv-123');
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('deleted_at IS NULL'),
-        ['conv-123']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('deleted_at IS NULL'), [
+        'conv-123',
+      ]);
     });
 
     it('should include deleted messages when requested', async () => {
@@ -468,10 +465,9 @@ describe('Message Model', () => {
 
       await Message.countByConversation('conv-123', true);
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.not.stringContaining('deleted_at IS NULL'),
-        ['conv-123']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.not.stringContaining('deleted_at IS NULL'), [
+        'conv-123',
+      ]);
     });
 
     it('should return 0 for empty conversation', async () => {
@@ -517,10 +513,9 @@ describe('Message Model', () => {
 
       await Message.getLatest('conv-123');
 
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('deleted_at IS NULL'),
-        ['conv-123']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('deleted_at IS NULL'), [
+        'conv-123',
+      ]);
     });
   });
 
@@ -547,10 +542,9 @@ describe('Message Model', () => {
       const result = await Message.exists('deleted-msg');
 
       expect(result).toBe(false);
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('deleted_at IS NULL'),
-        ['deleted-msg']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('deleted_at IS NULL'), [
+        'deleted-msg',
+      ]);
     });
   });
 
