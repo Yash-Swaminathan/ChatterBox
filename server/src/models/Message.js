@@ -138,14 +138,16 @@ class Message {
     }
 
     // Apply cursor for pagination (get messages before this message)
+    // Uses composite cursor (created_at, id) to handle messages with identical timestamps
     if (cursor) {
-      query += ` AND m.created_at < (SELECT created_at FROM messages WHERE id = $${paramIndex})`;
+      query += ` AND (m.created_at, m.id) < (SELECT created_at, id FROM messages WHERE id = $${paramIndex})`;
       params.push(cursor);
       paramIndex++;
     }
 
-    // Order by newest first, limit +1 for hasMore check
-    query += ` ORDER BY m.created_at DESC LIMIT $${paramIndex}`;
+    // Order by newest first with secondary sort by id for deterministic ordering
+    // This ensures stable pagination even when messages have identical timestamps
+    query += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${paramIndex}`;
     params.push(safeLimit + 1);
 
     const result = await pool.query(query, params);

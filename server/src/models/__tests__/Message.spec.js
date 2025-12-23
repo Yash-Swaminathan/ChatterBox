@@ -220,10 +220,11 @@ describe('Message Model', () => {
     it('should support cursor-based pagination', async () => {
       pool.query = jest.fn().mockResolvedValue({ rows: [mockMessages[2]] });
 
-      const result = await Message.findByConversation('conv-123', { cursor: 'msg-2' });
+      await Message.findByConversation('conv-123', { cursor: 'msg-2' });
 
+      // Uses composite cursor (created_at, id) for deterministic ordering
       expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('created_at <'),
+        expect.stringContaining('(m.created_at, m.id) <'),
         expect.arrayContaining(['conv-123', 'msg-2'])
       );
     });

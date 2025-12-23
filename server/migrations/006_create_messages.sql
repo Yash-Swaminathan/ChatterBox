@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -63,3 +65,5 @@ COMMENT ON COLUMN messages.created_at IS 'Timestamp when message was created';
 COMMENT ON COLUMN messages.updated_at IS 'Timestamp when message was last updated (auto-updated via trigger)';
 COMMENT ON COLUMN messages.deleted_at IS 'Soft delete timestamp, NULL if message is not deleted';
 COMMENT ON COLUMN messages.reply_to_id IS 'Parent message ID for reply threads (future feature - Week 9+)';
+
+COMMIT;
