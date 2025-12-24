@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/messageController');
 const { requireAuth } = require('../middleware/auth');
+const { validateGetMessages } = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
 
 // Rate limiter: 60 requests/minute for message retrieval
@@ -12,7 +13,12 @@ const getMessagesLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // Use user ID for rate limiting (more accurate than IP)
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  keyGenerator: (req) => {
+    // Prefer user ID if authenticated, otherwise skip rate limiting
+    // (auth middleware will catch unauthenticated requests)
+    return req.user?.userId || 'unauthenticated';
+  },
+  skip: (req) => !req.user, // Skip rate limiting for unauthenticated requests
 });
 
 /**
@@ -30,6 +36,7 @@ const getMessagesLimiter = rateLimit({
 router.get(
   '/conversations/:conversationId',
   requireAuth,
+  validateGetMessages,
   getMessagesLimiter,
   messageController.getConversationMessages
 );

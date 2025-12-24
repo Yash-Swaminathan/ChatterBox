@@ -376,6 +376,29 @@ class Message {
       conversationId: row.conversation_id,
     };
   }
+
+  /**
+   * Get count of unread messages for a user in a conversation
+   * Unread = messages with status 'sent' or 'delivered' (not 'read')
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @param {string} userId - User UUID
+   * @returns {Promise<number>} Count of unread messages
+   */
+  static async getUnreadCount(conversationId, userId) {
+    const result = await pool.query(
+      `SELECT COUNT(*) as count
+       FROM message_status ms
+       INNER JOIN messages m ON ms.message_id = m.id
+       WHERE m.conversation_id = $1
+         AND ms.user_id = $2
+         AND ms.status != 'read'
+         AND m.deleted_at IS NULL`,
+      [conversationId, userId]
+    );
+
+    return parseInt(result.rows[0].count, 10) || 0;
+  }
 }
 
 module.exports = Message;

@@ -20,8 +20,18 @@ async function getConversationMessages(req, res) {
   const includeDeleted = req.query.includeDeleted === 'true';
 
   try {
-    // 1. Verify user is participant
-    const isParticipant = await Conversation.isParticipant(conversationId, userId);
+    // 1. Check conversation exists and user is participant (single query)
+    const { exists, isParticipant } = await Conversation.getAccessStatus(conversationId, userId);
+
+    if (!exists) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Conversation not found',
+        },
+      });
+    }
 
     if (!isParticipant) {
       return res.status(403).json({
