@@ -285,6 +285,55 @@ function validateGetConversations(req, res, next) {
   next();
 }
 
+/**
+ * Validate get messages request
+ *
+ * @param {Object} req - request object
+ * @param {Object} res - response object
+ * @param {Function} next - next middleware function
+ */
+function validateGetMessages(req, res, next) {
+  const { conversationId } = req.params;
+  const { limit, cursor, includeDeleted } = req.query;
+  const errors = [];
+
+  // Validate conversationId (UUID)
+  if (!conversationId || !isValidUUID(conversationId)) {
+    errors.push('Valid conversation ID required');
+  }
+
+  // Validate limit (optional, 1-100, default 50)
+  if (limit !== undefined) {
+    const limitNum = parseInt(limit, 10);
+    if (isNaN(limitNum) || !isInRange(limitNum, 1, 100)) {
+      errors.push('limit must be a number between 1 and 100');
+    }
+  }
+
+  // Validate cursor (optional UUID)
+  if (cursor && !isValidUUID(cursor)) {
+    errors.push('cursor must be a valid UUID');
+  }
+
+  // Validate includeDeleted (optional boolean string)
+  if (includeDeleted !== undefined && !isOneOf(includeDeleted, ['true', 'false'])) {
+    errors.push('includeDeleted must be true or false');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: errors[0],
+        field: errors.length === 1 ? Object.keys(req.query)[0] : undefined,
+      },
+    });
+  }
+
+  next();
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -292,4 +341,5 @@ module.exports = {
   validateStatusUpdate,
   validateCreateDirectConversation,
   validateGetConversations,
+  validateGetMessages,
 };
