@@ -467,6 +467,9 @@ async function handleMessageEdit(io, socket, data) {
       return;
     }
 
+    // Invalidate conversation cache
+    await MessageCacheService.invalidateConversation(conversationId);
+
     // Broadcast edit to all participants
     const roomName = `conversation:${conversationId}`;
     io.to(roomName).emit('message:edited', {
