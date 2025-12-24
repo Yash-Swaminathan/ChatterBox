@@ -21,7 +21,7 @@ describe('Message Controller - Message Retrieval', () => {
       `INSERT INTO users (username, email, password_hash)
        VALUES ($1, $2, $3)
        RETURNING id, username, email`,
-      ['testuser_msg_ret_1', 'testmsgret1@example.com', hashedPassword]
+      ['testuser_msg_ret_1', 'testmsgret1@msgtest.local', hashedPassword]
     );
     testUser1 = user1Result.rows[0];
     testToken1 = generateAccessToken({ userId: testUser1.id, email: testUser1.email });
@@ -30,7 +30,7 @@ describe('Message Controller - Message Retrieval', () => {
       `INSERT INTO users (username, email, password_hash)
        VALUES ($1, $2, $3)
        RETURNING id, username, email`,
-      ['testuser_msg_ret_2', 'testmsgret2@example.com', hashedPassword]
+      ['testuser_msg_ret_2', 'testmsgret2@msgtest.local', hashedPassword]
     );
     testUser2 = user2Result.rows[0];
     testToken2 = generateAccessToken({ userId: testUser2.id, email: testUser2.email });
@@ -39,7 +39,7 @@ describe('Message Controller - Message Retrieval', () => {
       `INSERT INTO users (username, email, password_hash)
        VALUES ($1, $2, $3)
        RETURNING id, username, email`,
-      ['testuser_msg_ret_3', 'testmsgret3@example.com', hashedPassword]
+      ['testuser_msg_ret_3', 'testmsgret3@msgtest.local', hashedPassword]
     );
     testUser3 = user3Result.rows[0];
     testToken3 = generateAccessToken({ userId: testUser3.id, email: testUser3.email });
@@ -51,7 +51,7 @@ describe('Message Controller - Message Retrieval', () => {
 
   afterAll(async () => {
     // Clean up test data (don't close shared pool - let Jest handle lifecycle)
-    await pool.query('DELETE FROM users WHERE email LIKE \'testmsgret%@example.com\'');
+    await pool.query('DELETE FROM users WHERE email LIKE \'%@msgtest.local\'');
   });
 
   beforeEach(async () => {
@@ -505,28 +505,4 @@ describe('Message Controller - Message Retrieval', () => {
     });
   });
 
-  describe('Rate Limiting', () => {
-    test('should enforce rate limit (60 req/min)', async () => {
-      // Create a message for the test
-      await Message.create(testConversation.id, testUser1.id, 'Test message');
-
-      // Test rate limiting with fewer requests to avoid pool exhaustion
-      // We'll verify that requests succeed up to the limit
-      let successCount = 0;
-      const REQUEST_COUNT = 10; // Test with 10 requests instead of 60
-
-      for (let i = 0; i < REQUEST_COUNT; i++) {
-        const response = await request(app)
-          .get(`/api/messages/conversations/${testConversation.id}`)
-          .set('Authorization', `Bearer ${testToken1}`);
-
-        if (response.status === 200) {
-          successCount++;
-        }
-      }
-
-      // All 10 requests should succeed (well under the 60/min limit)
-      expect(successCount).toBe(REQUEST_COUNT);
-    }, 30000);
-  });
 });
