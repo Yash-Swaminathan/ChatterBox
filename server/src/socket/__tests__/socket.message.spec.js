@@ -19,6 +19,18 @@ jest.mock('../../models/Message', () => ({
 jest.mock('../../models/Conversation', () => ({
   isParticipant: jest.fn(),
   touch: jest.fn(),
+  getParticipants: jest.fn(),
+}));
+
+jest.mock('../../models/MessageStatus', () => ({
+  createInitialStatus: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../services/messageCacheService', () => ({
+  invalidateConversation: jest.fn().mockResolvedValue(undefined),
+  incrementUnread: jest.fn().mockResolvedValue(undefined),
+  getRecentMessages: jest.fn().mockResolvedValue(null),
+  setRecentMessages: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../../services/presenceService', () => ({
@@ -142,6 +154,10 @@ describe('Socket.io Message Integration Tests', () => {
 
     Conversation.isParticipant.mockResolvedValue(true);
     Conversation.touch.mockResolvedValue(undefined);
+    Conversation.getParticipants.mockResolvedValue([
+      { user_id: testUserId, username: 'testuser1' },
+      { user_id: testUserId2, username: 'testuser2' },
+    ]);
   });
 
   afterEach(() => {
