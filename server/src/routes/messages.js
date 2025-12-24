@@ -13,12 +13,12 @@ const getMessagesLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   // Use user ID for rate limiting (more accurate than IP)
-  keyGenerator: (req) => {
+  keyGenerator: req => {
     // Prefer user ID if authenticated, otherwise skip rate limiting
     // (auth middleware will catch unauthenticated requests)
     return req.user?.userId || 'unauthenticated';
   },
-  skip: (req) => !req.user, // Skip rate limiting for unauthenticated requests
+  skip: req => !req.user, // Skip rate limiting for unauthenticated requests
 });
 
 /**
@@ -48,11 +48,6 @@ router.get(
  *
  * Response: { totalUnread, byConversation }
  */
-router.get(
-  '/unread',
-  requireAuth,
-  getMessagesLimiter,
-  messageController.getUnreadCounts
-);
+router.get('/unread', requireAuth, getMessagesLimiter, messageController.getUnreadCounts);
 
 module.exports = router;

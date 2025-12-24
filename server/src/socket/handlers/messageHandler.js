@@ -350,9 +350,7 @@ async function handleMessageSend(io, socket, data) {
 
     // Get recipient IDs (all participants except sender)
     const participants = await Conversation.getParticipants(conversationId);
-    const recipientIds = participants
-      .map(p => p.user_id)
-      .filter(id => id !== userId);
+    const recipientIds = participants.map(p => p.user_id).filter(id => id !== userId);
 
     // Create initial message status entries (sent) for all recipients
     if (recipientIds.length > 0) {
@@ -792,9 +790,7 @@ async function handleMessageRead(io, socket, data) {
       // Get all senders from this conversation to notify them
       // (This is simplified - in production you might want to get only unread message senders)
       const messages = await Message.findByConversation(conversationId, { limit: 100 });
-      senderIds = [...new Set(messages.messages.map(m => m.sender_id))].filter(
-        id => id !== userId
-      );
+      senderIds = [...new Set(messages.messages.map(m => m.sender_id))].filter(id => id !== userId);
 
       logger.info('Conversation marked as read', {
         userId,

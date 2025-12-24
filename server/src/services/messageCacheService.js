@@ -41,7 +41,7 @@ class MessageCacheService {
       }
 
       // Parse JSON strings back to objects
-      const messages = cached.map((msgStr) => JSON.parse(msgStr));
+      const messages = cached.map(msgStr => JSON.parse(msgStr));
 
       logger.debug('Cache hit - recent messages', {
         conversationId,
@@ -78,7 +78,7 @@ class MessageCacheService {
       // Only cache up to MAX_RECENT_MESSAGES
       const pipeline = redisClient.multi();
 
-      messages.slice(0, CACHE_TTL.MAX_RECENT_MESSAGES).forEach((msg) => {
+      messages.slice(0, CACHE_TTL.MAX_RECENT_MESSAGES).forEach(msg => {
         const timestamp = new Date(msg.created_at).getTime() / 1000;
         pipeline.zAdd(key, {
           score: timestamp,

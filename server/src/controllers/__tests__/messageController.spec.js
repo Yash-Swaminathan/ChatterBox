@@ -51,7 +51,7 @@ describe('Message Controller - Message Retrieval', () => {
 
   afterAll(async () => {
     // Clean up test data (don't close shared pool - let Jest handle lifecycle)
-    await pool.query('DELETE FROM users WHERE email LIKE \'%@msgtest.local\'');
+    await pool.query("DELETE FROM users WHERE email LIKE '%@msgtest.local'");
   });
 
   beforeEach(async () => {
@@ -94,11 +94,7 @@ describe('Message Controller - Message Retrieval', () => {
         // Create 75 messages
         const messages = [];
         for (let i = 0; i < 75; i++) {
-          const msg = await Message.create(
-            testConversation.id,
-            testUser1.id,
-            `Message ${i + 1}`
-          );
+          const msg = await Message.create(testConversation.id, testUser1.id, `Message ${i + 1}`);
           messages.push(msg);
         }
 
@@ -182,16 +178,8 @@ describe('Message Controller - Message Retrieval', () => {
 
     describe('Deleted Messages', () => {
       test('should exclude soft-deleted messages by default', async () => {
-        const msg1 = await Message.create(
-          testConversation.id,
-          testUser1.id,
-          'Active message'
-        );
-        const msg2 = await Message.create(
-          testConversation.id,
-          testUser1.id,
-          'Deleted message'
-        );
+        const msg1 = await Message.create(testConversation.id, testUser1.id, 'Active message');
+        const msg2 = await Message.create(testConversation.id, testUser1.id, 'Deleted message');
 
         // Soft delete the second message
         await Message.softDelete(msg2.id);
@@ -206,16 +194,8 @@ describe('Message Controller - Message Retrieval', () => {
       });
 
       test('should include soft-deleted messages when includeDeleted=true', async () => {
-        const msg1 = await Message.create(
-          testConversation.id,
-          testUser1.id,
-          'Active message'
-        );
-        const msg2 = await Message.create(
-          testConversation.id,
-          testUser1.id,
-          'Deleted message'
-        );
+        const msg1 = await Message.create(testConversation.id, testUser1.id, 'Active message');
+        const msg2 = await Message.create(testConversation.id, testUser1.id, 'Deleted message');
 
         await Message.softDelete(msg2.id);
 
@@ -231,11 +211,7 @@ describe('Message Controller - Message Retrieval', () => {
         // Create 10 messages
         const messages = [];
         for (let i = 0; i < 10; i++) {
-          const msg = await Message.create(
-            testConversation.id,
-            testUser1.id,
-            `Message ${i + 1}`
-          );
+          const msg = await Message.create(testConversation.id, testUser1.id, `Message ${i + 1}`);
           messages.push(msg);
         }
 
@@ -320,9 +296,7 @@ describe('Message Controller - Message Retrieval', () => {
 
     describe('Authorization Tests', () => {
       test('should return 401 when no auth token provided', async () => {
-        await request(app)
-          .get(`/api/messages/conversations/${testConversation.id}`)
-          .expect(401);
+        await request(app).get(`/api/messages/conversations/${testConversation.id}`).expect(401);
       });
 
       test('should return 403 when user is not a participant', async () => {
@@ -357,9 +331,7 @@ describe('Message Controller - Message Retrieval', () => {
           const promises = [];
           for (let i = 0; i < BATCH_SIZE; i++) {
             const msgNum = batch * BATCH_SIZE + i + 1;
-            promises.push(
-              Message.create(testConversation.id, testUser1.id, `Message ${msgNum}`)
-            );
+            promises.push(Message.create(testConversation.id, testUser1.id, `Message ${msgNum}`));
           }
           await Promise.all(promises);
         }
@@ -393,7 +365,7 @@ describe('Message Controller - Message Retrieval', () => {
         expect(response1.body.data.messages).toHaveLength(10);
 
         // Allow time for async cache population
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 200));
 
         // Second request - may hit cache depending on Redis availability
         const response2 = await request(app)
@@ -434,9 +406,9 @@ describe('Message Controller - Message Retrieval', () => {
       test('should maintain correct order (newest first) with pagination', async () => {
         // Create messages with delays to ensure different timestamps
         const msg1 = await Message.create(testConversation.id, testUser1.id, 'First');
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 10));
         const msg2 = await Message.create(testConversation.id, testUser1.id, 'Second');
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 10));
         const msg3 = await Message.create(testConversation.id, testUser1.id, 'Third');
 
         const response = await request(app)
@@ -504,5 +476,4 @@ describe('Message Controller - Message Retrieval', () => {
       await request(app).get('/api/messages/unread').expect(401);
     });
   });
-
 });

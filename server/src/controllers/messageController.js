@@ -45,10 +45,7 @@ async function getConversationMessages(req, res) {
 
     // 2. Try cache first (only for first page, no cursor, no deleted filter)
     if (!cursor && !includeDeleted && limit <= 50) {
-      const cachedMessages = await MessageCacheService.getRecentMessages(
-        conversationId,
-        limit
-      );
+      const cachedMessages = await MessageCacheService.getRecentMessages(conversationId, limit);
 
       if (cachedMessages) {
         const cacheTime = Date.now() - startTime;
@@ -81,12 +78,11 @@ async function getConversationMessages(req, res) {
 
     // 4. Populate cache for first page (async, non-blocking)
     if (!cursor && !includeDeleted && result.messages.length > 0) {
-      MessageCacheService.setRecentMessages(conversationId, result.messages).catch(
-        (err) =>
-          logger.error('Cache population error', {
-            conversationId,
-            error: err.message,
-          })
+      MessageCacheService.setRecentMessages(conversationId, result.messages).catch(err =>
+        logger.error('Cache population error', {
+          conversationId,
+          error: err.message,
+        })
       );
     }
 
@@ -166,7 +162,7 @@ async function getUnreadCounts(req, res) {
     let totalUnread = 0;
 
     await Promise.all(
-      conversations.map(async (conv) => {
+      conversations.map(async conv => {
         // Try cache first, fall back to database
         const count =
           (await MessageCacheService.getUnreadCount(conv.id, userId)) ||

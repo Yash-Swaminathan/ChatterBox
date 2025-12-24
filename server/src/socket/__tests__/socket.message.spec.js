@@ -376,7 +376,10 @@ describe('Socket.io Message Integration Tests', () => {
     it('should deliver to sender after auto-join', async () => {
       // Use a unique user to avoid rate limit issues
       const broadcastUserId = 'broadcast-test-user-' + Date.now();
-      const broadcastToken = generateAccessToken({ userId: broadcastUserId, username: 'broadcastuser' });
+      const broadcastToken = generateAccessToken({
+        userId: broadcastUserId,
+        username: 'broadcastuser',
+      });
 
       // Update mock for this user
       Conversation.isParticipant.mockResolvedValue(true);

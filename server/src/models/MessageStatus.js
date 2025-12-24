@@ -25,9 +25,7 @@ class MessageStatus {
 
     try {
       // Build VALUES clause for batch insert
-      const values = recipientIds
-        .map((_, idx) => `($1, $${idx + 2}, 'sent')`)
-        .join(', ');
+      const values = recipientIds.map((_, idx) => `($1, $${idx + 2}, 'sent')`).join(', ');
 
       const query = `
         INSERT INTO message_status (message_id, user_id, status)
@@ -155,7 +153,7 @@ class MessageStatus {
       `;
 
       const result = await pool.query(query, [messageIds]);
-      return result.rows.map((row) => row.sender_id);
+      return result.rows.map(row => row.sender_id);
     } catch (error) {
       logger.error('Error getting sender IDs', {
         messageCount: messageIds.length,
@@ -188,7 +186,7 @@ class MessageStatus {
       const counts = { sent: 0, delivered: 0, read: 0 };
 
       // Populate from query results
-      result.rows.forEach((row) => {
+      result.rows.forEach(row => {
         counts[row.status] = parseInt(row.count, 10);
       });
 
@@ -210,9 +208,7 @@ class MessageStatus {
    */
   static async deleteByMessage(messageId) {
     try {
-      await pool.query('DELETE FROM message_status WHERE message_id = $1', [
-        messageId,
-      ]);
+      await pool.query('DELETE FROM message_status WHERE message_id = $1', [messageId]);
 
       logger.debug('Message status entries deleted', { messageId });
     } catch (error) {
