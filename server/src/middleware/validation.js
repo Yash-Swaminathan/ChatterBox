@@ -9,10 +9,6 @@ const matcher = new RegExpMatcher({
 
 /**
  * Validate registration input
- *
- * @param {Object} req - request object
- * @param {Object} res - response object
- * @param {Function} next - next middleware function (callback)
  */
 function validateRegistration(req, res, next) {
   const { username, email, password } = req.body;
@@ -67,10 +63,6 @@ function validateRegistration(req, res, next) {
 
 /**
  * Validate login input
- *
- * @param {Object} req - request object
- * @param {Object} res - response object
- * @param {Function} next - next middleware function (callback)
  */
 function validateLogin(req, res, next) {
   const { email, password } = req.body;
@@ -100,10 +92,6 @@ function validateLogin(req, res, next) {
 
 /**
  * Validate profile update input
- *
- * @param {Object} req - request object
- * @param {Object} res - response object
- * @param {Function} next - next middleware function (callback)
  */
 function validateProfileUpdate(req, res, next) {
   const { display_name, bio, status } = req.body;
@@ -165,10 +153,6 @@ function validateProfileUpdate(req, res, next) {
 
 /**
  * Validate status update input
- *
- * @param {Object} req - request object
- * @param {Object} res - response object
- * @param {Function} next - next middleware function (callback)
  */
 function validateStatusUpdate(req, res, next) {
   const { status } = req.body;
@@ -211,10 +195,6 @@ function validateStatusUpdate(req, res, next) {
 
 /**
  * Validate create direct conversation input
- *
- * @param {Object} req - request object
- * @param {Object} res - response object
- * @param {Function} next - next middleware function
  */
 function validateCreateDirectConversation(req, res, next) {
   const { participantId } = req.body;
@@ -242,10 +222,6 @@ function validateCreateDirectConversation(req, res, next) {
 
 /**
  * Validate get conversations query parameters
- *
- * @param {Object} req - request object
- * @param {Object} res - response object
- * @param {Function} next - next middleware function
  */
 function validateGetConversations(req, res, next) {
   const { limit, offset, type } = req.query;
@@ -287,10 +263,6 @@ function validateGetConversations(req, res, next) {
 
 /**
  * Validate get messages request
- *
- * @param {Object} req - request object
- * @param {Object} res - response object
- * @param {Function} next - next middleware function
  */
 function validateGetMessages(req, res, next) {
   const { conversationId } = req.params;
@@ -334,6 +306,64 @@ function validateGetMessages(req, res, next) {
   next();
 }
 
+/**
+ * Validate message edit request
+ */
+function validateMessageEdit(req, res, next) {
+  const { messageId } = req.params;
+  const { content } = req.body;
+  const errors = [];
+
+  // Validate messageId is UUID
+  if (!messageId || !isValidUUID(messageId)) {
+    errors.push('Valid message ID required');
+  }
+
+  // Validate content exists (detailed validation in Message.validateContent)
+  if (content === undefined || content === null) {
+    errors.push('Content is required');
+  } else if (typeof content !== 'string') {
+    errors.push('Content must be a string');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'INVALID_INPUT',
+        message: errors[0],
+      },
+    });
+  }
+
+  next();
+}
+
+/**
+ * Validate message delete request
+ */
+function validateMessageDelete(req, res, next) {
+  const { messageId } = req.params;
+  const errors = [];
+
+  // Validate messageId is UUID
+  if (!messageId || !isValidUUID(messageId)) {
+    errors.push('Valid message ID required');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'INVALID_INPUT',
+        message: errors[0],
+      },
+    });
+  }
+
+  next();
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -342,4 +372,6 @@ module.exports = {
   validateCreateDirectConversation,
   validateGetConversations,
   validateGetMessages,
+  validateMessageEdit,
+  validateMessageDelete,
 };
