@@ -1,6 +1,21 @@
 const logger = require('./logger');
 
-// TODO Week 17: Move to Redis for horizontal scaling
+/**
+ * Shared Rate Limiter for Socket.io and REST API
+ *
+ * TODO Week 17: Migrate to Redis for horizontal scaling
+ *
+ * Current: In-memory Map (single-server deployment)
+ * Future: Redis-based with commands like:
+ *   - await redis.incr(`ratelimit:${userId}:messages`)
+ *   - await redis.expire(`ratelimit:${userId}:messages`, 60)
+ *
+ * Benefits of Redis migration:
+ * - Works across multiple server instances
+ * - Survives server restarts
+ * - Automatic TTL expiration (no manual cleanup needed)
+ * - Atomic increment operations
+ */
 const RATE_LIMIT = {
   MESSAGES_PER_WINDOW: 30,
   WINDOW_SIZE_MS: 60000,
