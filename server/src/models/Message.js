@@ -3,6 +3,20 @@ const logger = require('../utils/logger');
 
 class Message {
   static MAX_CONTENT_LENGTH = 10000;
+  static EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+  // Error codes for message operations
+  static ERROR_CODES = {
+    MESSAGE_NOT_FOUND: 'MESSAGE_NOT_FOUND',
+    NOT_OWNER: 'NOT_OWNER',
+    MESSAGE_DELETED: 'MESSAGE_DELETED',
+    EDIT_WINDOW_EXPIRED: 'EDIT_WINDOW_EXPIRED',
+    INVALID_INPUT: 'INVALID_INPUT',
+    DATABASE_ERROR: 'DATABASE_ERROR',
+    RATE_LIMITED: 'RATE_LIMITED',
+    CONTENT_EMPTY: 'CONTENT_EMPTY',
+    CONTENT_TOO_LONG: 'CONTENT_TOO_LONG',
+  };
 
   /**
    * Create a new message
@@ -398,6 +412,77 @@ class Message {
     );
 
     return parseInt(result.rows[0].count, 10) || 0;
+  }
+
+  /**
+   * Check if message is editable by user (ownership + time limit)
+   * Enforces 15-minute edit window from message creation time
+   *
+   * @param {string} messageId - Message UUID
+   * @param {string} userId - User UUID
+   * @returns {Promise<{allowed: boolean, reason?: string, conversationId?: string, createdAt?: Date}>}
+   *
+   * Returns:
+   * - {allowed: true, conversationId, createdAt} - User can edit
+   * - {allowed: false, reason: 'MESSAGE_NOT_FOUND'} - Message doesn't exist
+   * - {allowed: false, reason: 'MESSAGE_DELETED'} - Message is soft-deleted
+   * - {allowed: false, reason: 'NOT_OWNER'} - User is not the sender
+   * - {allowed: false, reason: 'EDIT_WINDOW_EXPIRED'} - >15 minutes since creation
+   */
+  static async isEditableByUser(messageId, userId) {
+    // Get message info atomically
+    const result = await pool.query(
+      `SELECT
+        sender_id,
+        conversation_id,
+        created_at,
+        deleted_at
+      FROM messages
+      WHERE id = $1`,
+      [messageId]
+    );
+
+    // Message doesn't exist
+    if (result.rows.length === 0) {
+      return {
+        allowed: false,
+        reason: this.ERROR_CODES.MESSAGE_NOT_FOUND,
+      };
+    }
+
+    const message = result.rows[0];
+
+    // Message is soft-deleted
+    if (message.deleted_at !== null) {
+      return {
+        allowed: false,
+        reason: this.ERROR_CODES.MESSAGE_DELETED,
+      };
+    }
+
+    // User is not the owner/sender
+    if (message.sender_id !== userId) {
+      return {
+        allowed: false,
+        reason: this.ERROR_CODES.NOT_OWNER,
+      };
+    }
+
+    // Check 15-minute edit window
+    const ageMs = Date.now() - new Date(message.created_at).getTime();
+    if (ageMs > this.EDIT_WINDOW_MS) {
+      return {
+        allowed: false,
+        reason: this.ERROR_CODES.EDIT_WINDOW_EXPIRED,
+      };
+    }
+
+    // All checks passed - user can edit
+    return {
+      allowed: true,
+      conversationId: message.conversation_id,
+      createdAt: message.created_at,
+    };
   }
 }
 
