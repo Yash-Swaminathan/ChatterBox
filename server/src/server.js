@@ -21,6 +21,9 @@ async function startServer() {
     const io = await initializeSocket(httpServer);
     logger.info('Socket.io initialized successfully');
 
+    // Attach Socket.io to Express app for REST API access
+    app.set('io', io);
+
     // Start server (both HTTP and WebSocket)
     httpServer.listen(PORT, () => {
       console.log('Server Started!');
