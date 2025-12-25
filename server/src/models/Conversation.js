@@ -306,6 +306,28 @@ class Conversation {
   }
 
   /**
+   * Check conversation access status in a single query
+   * Returns whether conversation exists and if user is a participant
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @param {string} userId - User UUID to check
+   * @returns {Promise<{exists: boolean, isParticipant: boolean}>}
+   */
+  static async getAccessStatus(conversationId, userId) {
+    const result = await pool.query(
+      `SELECT
+         EXISTS(SELECT 1 FROM conversations WHERE id = $1) as exists,
+         EXISTS(SELECT 1 FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2) as is_participant`,
+      [conversationId, userId]
+    );
+
+    return {
+      exists: result.rows[0].exists,
+      isParticipant: result.rows[0].is_participant,
+    };
+  }
+
+  /**
    * Update conversation's updated_at timestamp
    *
    * @param {string} conversationId - Conversation UUID
@@ -320,6 +342,25 @@ class Conversation {
     );
 
     logger.debug('Conversation touched', { conversationId });
+  }
+
+  /**
+   * Get all participants for a conversation with user details
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @returns {Promise<Array>} Array of participant objects
+   */
+  static async getParticipants(conversationId) {
+    const result = await pool.query(
+      `SELECT cp.user_id, cp.joined_at, cp.is_admin,
+              u.username, u.display_name, u.avatar_url
+       FROM conversation_participants cp
+       JOIN users u ON cp.user_id = u.id
+       WHERE cp.conversation_id = $1`,
+      [conversationId]
+    );
+
+    return result.rows;
   }
 
   /**

@@ -1,7 +1,20 @@
 const Message = require('../../models/Message');
 const Conversation = require('../../models/Conversation');
+const MessageStatus = require('../../models/MessageStatus');
+const MessageCacheService = require('../../services/messageCacheService');
 const logger = require('../../utils/logger');
 const { isValidUUID } = require('../../utils/validators');
+
+/**
+ * Message Handler - Socket.io event handlers for real-time messaging
+ *
+ * TODO: Future Improvements (from Code Review)
+ * - Move rate limiter to Redis for horizontal scaling (currently in-memory Map)
+ * - Optimize read receipt broadcasting (only send to message sender, not entire room)
+ * - Batch read status updates (send every 5s instead of immediately)
+ * - Add duplicate status update check before DB query
+ * - Add Prometheus metrics for message throughput and latency
+ */
 
 const RATE_LIMIT = {
   MESSAGES_PER_WINDOW: 30, // Max messages per window
@@ -346,6 +359,21 @@ async function handleMessageSend(io, socket, data) {
     // Save message to database
     const message = await Message.create(conversationId, userId, content);
 
+    // Get recipient IDs (all participants except sender)
+    const participants = await Conversation.getParticipants(conversationId);
+    const recipientIds = participants.map(p => p.user_id).filter(id => id !== userId);
+
+    // Create initial message status entries (sent) for all recipients
+    if (recipientIds.length > 0) {
+      await MessageStatus.createInitialStatus(message.id, recipientIds);
+    }
+
+    // Invalidate conversation cache and increment unread counts
+    await MessageCacheService.invalidateConversation(conversationId);
+    for (const recipientId of recipientIds) {
+      await MessageCacheService.incrementUnread(conversationId, recipientId);
+    }
+
     // Update conversation's updated_at timestamp
     await Conversation.touch(conversationId);
 
@@ -448,6 +476,9 @@ async function handleMessageEdit(io, socket, data) {
       return;
     }
 
+    // Invalidate conversation cache
+    await MessageCacheService.invalidateConversation(conversationId);
+
     // Broadcast edit to all participants
     const roomName = `conversation:${conversationId}`;
     io.to(roomName).emit('message:edited', {
@@ -536,6 +567,9 @@ async function handleMessageDelete(io, socket, data) {
       });
       return;
     }
+
+    // Invalidate conversation cache
+    await MessageCacheService.invalidateConversation(conversationId);
 
     // Broadcast deletion to all participants
     const roomName = `conversation:${conversationId}`;
@@ -633,6 +667,225 @@ function handleConversationLeave(socket, data) {
 }
 
 /**
+ * Handle message:delivered event
+ * Client confirms messages have been received
+ * @param {Object} io - Socket.io server instance
+ * @param {Object} socket - Socket instance
+ * @param {Object} data - Event data with messageIds array
+ */
+async function handleMessageDelivered(io, socket, data) {
+  const { userId } = socket.user;
+
+  try {
+    // Validate input
+    if (!data || !Array.isArray(data.messageIds) || data.messageIds.length === 0) {
+      socket.emit('message:error', {
+        code: ERROR_CODES.INVALID_INPUT,
+        message: 'messageIds array required',
+      });
+      return;
+    }
+
+    const { messageIds } = data;
+
+    // Validate all message IDs are UUIDs
+    const invalidIds = messageIds.filter(id => !isValidUUID(id));
+    if (invalidIds.length > 0) {
+      socket.emit('message:error', {
+        code: ERROR_CODES.INVALID_INPUT,
+        message: 'Invalid message ID format',
+      });
+      return;
+    }
+
+    // Batch update message status to 'delivered'
+    const updatedCount = await MessageStatus.batchUpdateStatus(messageIds, userId, 'delivered');
+
+    // Update cache for each message
+    const cacheUpdates = messageIds.map(messageId => ({
+      messageId,
+      userId,
+      status: 'delivered',
+    }));
+    await MessageCacheService.batchUpdateStatus(cacheUpdates);
+
+    // Get sender IDs to notify them
+    const senderIds = await MessageStatus.getSenderIds(messageIds);
+
+    // Broadcast delivery status to each sender
+    senderIds.forEach(senderId => {
+      io.to(`user:${senderId}`).emit('message:delivery-status', {
+        messageIds,
+        userId,
+        status: 'delivered',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    // Confirm to client
+    socket.emit('message:delivery-confirmed', {
+      messageIds,
+      updatedCount,
+    });
+
+    logger.info('Messages marked as delivered', {
+      userId,
+      messageCount: messageIds.length,
+      updatedCount,
+    });
+  } catch (error) {
+    logger.error('Error handling message:delivered', {
+      userId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    socket.emit('message:error', {
+      code: ERROR_CODES.DATABASE_ERROR,
+      message: 'Failed to mark messages as delivered',
+    });
+  }
+}
+
+/**
+ * Handle message:read event
+ * Mark messages as read when user views conversation
+ * @param {Object} io - Socket.io server instance
+ * @param {Object} socket - Socket instance
+ * @param {Object} data - Event data with conversationId or messageIds
+ */
+async function handleMessageRead(io, socket, data) {
+  const { userId } = socket.user;
+
+  try {
+    // Validate input
+    if (!data || typeof data !== 'object') {
+      socket.emit('message:error', {
+        code: ERROR_CODES.INVALID_INPUT,
+        message: 'Invalid request data',
+      });
+      return;
+    }
+
+    let updatedCount = 0;
+    let senderIds = [];
+
+    // Option 1: Mark entire conversation as read (bulk operation)
+    if (data.conversationId) {
+      const { conversationId } = data;
+
+      if (!isValidUUID(conversationId)) {
+        socket.emit('message:error', {
+          code: ERROR_CODES.INVALID_CONVERSATION,
+          message: 'Invalid conversation ID format',
+        });
+        return;
+      }
+
+      // Verify user is participant
+      const isParticipant = await Conversation.isParticipant(conversationId, userId);
+      if (!isParticipant) {
+        socket.emit('message:error', {
+          code: ERROR_CODES.NOT_PARTICIPANT,
+          message: 'You are not a participant in this conversation',
+        });
+        return;
+      }
+
+      // Mark all messages in conversation as read
+      updatedCount = await MessageStatus.markConversationAsRead(conversationId, userId);
+
+      // Reset unread count in cache
+      await MessageCacheService.resetUnread(conversationId, userId);
+
+      // Get all senders from this conversation to notify them
+      // (This is simplified - in production you might want to get only unread message senders)
+      const messages = await Message.findByConversation(conversationId, { limit: 100 });
+      senderIds = [...new Set(messages.messages.map(m => m.sender_id))].filter(id => id !== userId);
+
+      logger.info('Conversation marked as read', {
+        userId,
+        conversationId,
+        messagesRead: updatedCount,
+      });
+    }
+    // Option 2: Mark specific messages as read
+    else if (data.messageIds && Array.isArray(data.messageIds)) {
+      const { messageIds } = data;
+
+      if (messageIds.length === 0) {
+        socket.emit('message:error', {
+          code: ERROR_CODES.INVALID_INPUT,
+          message: 'messageIds array cannot be empty',
+        });
+        return;
+      }
+
+      // Validate all message IDs are UUIDs
+      const invalidIds = messageIds.filter(id => !isValidUUID(id));
+      if (invalidIds.length > 0) {
+        socket.emit('message:error', {
+          code: ERROR_CODES.INVALID_INPUT,
+          message: 'Invalid message ID format',
+        });
+        return;
+      }
+
+      // Batch update message status to 'read'
+      updatedCount = await MessageStatus.batchUpdateStatus(messageIds, userId, 'read');
+
+      // Update cache for each message
+      const cacheUpdates = messageIds.map(messageId => ({
+        messageId,
+        userId,
+        status: 'read',
+      }));
+      await MessageCacheService.batchUpdateStatus(cacheUpdates);
+
+      // Get sender IDs to notify them
+      senderIds = await MessageStatus.getSenderIds(messageIds);
+
+      logger.info('Messages marked as read', {
+        userId,
+        messageCount: messageIds.length,
+        updatedCount,
+      });
+    } else {
+      socket.emit('message:error', {
+        code: ERROR_CODES.INVALID_INPUT,
+        message: 'Either conversationId or messageIds required',
+      });
+      return;
+    }
+
+    // Broadcast read status to each sender
+    senderIds.forEach(senderId => {
+      io.to(`user:${senderId}`).emit('message:read-status', {
+        userId,
+        status: 'read',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    // Confirm to client
+    socket.emit('message:read-confirmed', {
+      updatedCount,
+    });
+  } catch (error) {
+    logger.error('Error handling message:read', {
+      userId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    socket.emit('message:error', {
+      code: ERROR_CODES.DATABASE_ERROR,
+      message: 'Failed to mark messages as read',
+    });
+  }
+}
+
+/**
  * Register message event handlers for a socket
  * @param {Object} io - Socket.io server instance
  * @param {Object} socket - Socket instance
@@ -641,6 +894,8 @@ function registerMessageHandlers(io, socket) {
   socket.on('message:send', data => handleMessageSend(io, socket, data));
   socket.on('message:edit', data => handleMessageEdit(io, socket, data));
   socket.on('message:delete', data => handleMessageDelete(io, socket, data));
+  socket.on('message:delivered', data => handleMessageDelivered(io, socket, data));
+  socket.on('message:read', data => handleMessageRead(io, socket, data));
   socket.on('conversation:join', data => handleConversationJoin(socket, data));
   socket.on('conversation:leave', data => handleConversationLeave(socket, data));
 }
@@ -650,6 +905,8 @@ module.exports = {
   handleMessageSend,
   handleMessageEdit,
   handleMessageDelete,
+  handleMessageDelivered,
+  handleMessageRead,
   handleConversationJoin,
   handleConversationLeave,
   // Lifecycle control for rate limiter cleanup

@@ -1,9 +1,3 @@
--- ============================================================================
--- Migration: 002_create_sessions_table.sql
--- Description: Create sessions table for JWT refresh token management
--- Created: 2025-11-23
--- ============================================================================
-
 -- Create sessions table
 CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
