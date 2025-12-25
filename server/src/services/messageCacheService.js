@@ -17,6 +17,12 @@ const CACHE_TTL = {
  * - Unread counts: < 10ms
  * - Status updates: < 5ms (batch operations)
  *
+ * TODO: Future Improvements (from Code Review)
+ * - Add cache key versioning to support different query params (limit, includeDeleted)
+ * - Implement distributed locking for cache population race conditions
+ * - Add cache hit rate metrics for monitoring
+ * - Consider Redis Cluster for high-availability production deployments
+ *
  * @class MessageCacheService
  */
 class MessageCacheService {

@@ -5,6 +5,17 @@ const MessageCacheService = require('../../services/messageCacheService');
 const logger = require('../../utils/logger');
 const { isValidUUID } = require('../../utils/validators');
 
+/**
+ * Message Handler - Socket.io event handlers for real-time messaging
+ *
+ * TODO: Future Improvements (from Code Review)
+ * - Move rate limiter to Redis for horizontal scaling (currently in-memory Map)
+ * - Optimize read receipt broadcasting (only send to message sender, not entire room)
+ * - Batch read status updates (send every 5s instead of immediately)
+ * - Add duplicate status update check before DB query
+ * - Add Prometheus metrics for message throughput and latency
+ */
+
 const RATE_LIMIT = {
   MESSAGES_PER_WINDOW: 30, // Max messages per window
   WINDOW_SIZE_MS: 60000, // 1 minute window

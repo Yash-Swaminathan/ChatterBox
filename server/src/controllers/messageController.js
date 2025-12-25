@@ -4,6 +4,17 @@ const MessageCacheService = require('../services/messageCacheService');
 const logger = require('../utils/logger');
 
 /**
+ * Message Controller - REST API for message retrieval and status management
+ *
+ * TODO: Future Improvements (from Code Review)
+ * - Cache participant lists in Redis to reduce N+1 queries (line 24)
+ * - Add Redis counter for unread counts instead of DB queries (line 164)
+ * - Add distributed locking for cache population to prevent race conditions
+ * - Implement Prometheus metrics for cache hit rates and response times
+ * - Add Redis pub/sub for cache invalidation across multiple servers
+ */
+
+/**
  * Get messages for a conversation with delivery status
  *
  * @param {Object} req - Express request
