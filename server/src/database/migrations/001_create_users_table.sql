@@ -1,9 +1,3 @@
--- ============================================================================
--- Migration: 001_create_users_table.sql
--- Description: Create users table for authentication and user profiles
--- Created: 2025-11-23
--- ============================================================================
-
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

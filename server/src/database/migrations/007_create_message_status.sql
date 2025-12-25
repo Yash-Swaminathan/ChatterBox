@@ -1,8 +1,3 @@
--- Migration: Create message_status table for delivery tracking
--- Purpose: Track sent/delivered/read status for each message per recipient
--- Supports: Read receipts, unread counts, delivery confirmations
--- Created: 2024-12-24
-
 BEGIN;
 
 -- Create message_status table
