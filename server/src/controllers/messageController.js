@@ -17,9 +17,6 @@ const { checkRateLimit } = require('../utils/rateLimiter');
 
 /**
  * Get messages for a conversation with delivery status
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
  */
 async function getConversationMessages(req, res) {
   const startTime = Date.now();
@@ -152,9 +149,6 @@ async function getConversationMessages(req, res) {
  *       }
  *     }
  *   }
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
  */
 async function getUnreadCounts(req, res) {
   const { userId } = req.user;
@@ -235,9 +229,6 @@ function getErrorMessage(code) {
  * Update message content (REST endpoint)
  * PUT /api/messages/:messageId
  * Body: { content: string }
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
  */
 async function updateMessage(req, res) {
   try {
@@ -358,9 +349,6 @@ async function updateMessage(req, res) {
 /**
  * Delete message (soft delete)
  * DELETE /api/messages/:messageId
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
  */
 async function deleteMessage(req, res) {
   try {

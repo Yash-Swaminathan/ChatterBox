@@ -18,10 +18,6 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
 /**
  * File filter function for Multer
  * Validates file type and rejects invalid files
- *
- * @param {Object} req - Express request object
- * @param {Object} file - Multer file object
- * @param {Function} cb - Callback function (error, acceptFile)
  */
 function fileFilter(req, file, cb) {
   // Check MIME type
@@ -92,11 +88,6 @@ const uploadAvatar = upload.single('avatar');
 /**
  * Error handling middleware for Multer errors
  * Converts Multer errors to consistent error responses
- *
- * @param {Error} err - Error object
- * @param {Object} req - Express request
- * @param {Object} res - Express response
- * @param {Function} next - Express next middleware
  */
 function handleUploadError(err, req, res, next) {
   // If no error, continue to next middleware
@@ -176,10 +167,6 @@ function handleUploadError(err, req, res, next) {
 /**
  * Validate that a file was uploaded
  * Use this middleware after uploadAvatar to ensure file exists
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
- * @param {Function} next - Express next middleware
  */
 function validateFileExists(req, res, next) {
   if (!req.file) {

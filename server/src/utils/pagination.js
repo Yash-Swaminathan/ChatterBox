@@ -10,7 +10,6 @@ const MIN_OFFSET = 0;
 
 /**
  * Extract and validate pagination parameters from request
- * @param {Object} req - Express request object
  * @returns {Object} Validated pagination params { limit, offset }
  */
 function getPaginationParams(req) {

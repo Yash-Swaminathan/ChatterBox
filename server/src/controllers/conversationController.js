@@ -6,9 +6,6 @@ const logger = require('../utils/logger');
 /**
  * Create or get a direct conversation between two users
  * POST /api/conversations/direct
- *
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 async function createDirectConversation(req, res) {
   try {
@@ -89,9 +86,6 @@ async function createDirectConversation(req, res) {
 /**
  * Get all conversations for the authenticated user
  * GET /api/conversations?limit=20&offset=0&type=direct
- *
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
  */
 async function getUserConversations(req, res) {
   try {
