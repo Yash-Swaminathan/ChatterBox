@@ -1,3 +1,4 @@
+-- rollback to reverse changes made by migration file
 BEGIN;
 
 -- Drop composite index for unread count queries
