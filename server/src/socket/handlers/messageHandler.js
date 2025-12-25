@@ -4,33 +4,21 @@ const MessageStatus = require('../../models/MessageStatus');
 const MessageCacheService = require('../../services/messageCacheService');
 const logger = require('../../utils/logger');
 const { isValidUUID } = require('../../utils/validators');
+const { checkRateLimit } = require('../../utils/rateLimiter');
 
 /**
  * Message Handler - Socket.io event handlers for real-time messaging
  *
  * TODO: Future Improvements (from Code Review)
- * - Move rate limiter to Redis for horizontal scaling (currently in-memory Map)
  * - Optimize read receipt broadcasting (only send to message sender, not entire room)
  * - Batch read status updates (send every 5s instead of immediately)
  * - Add duplicate status update check before DB query
  * - Add Prometheus metrics for message throughput and latency
+ *
+ * NOTE: Rate limiter moved to shared utility (server/src/utils/rateLimiter.js)
+ * - Shared across Socket.io and REST API for consistent rate limiting
+ * - TODO Week 17: Move to Redis for horizontal scaling
  */
-
-const RATE_LIMIT = {
-  MESSAGES_PER_WINDOW: 30, // Max messages per window
-  WINDOW_SIZE_MS: 60000, // 1 minute window
-  BURST_LIMIT: 5, // Max rapid-fire messages
-  BURST_WINDOW_MS: 1000, // 1 second burst window
-  PENALTY_DURATION_MS: 30000, // 30 second penalty for exceeding limit
-  CLEANUP_INTERVAL_MS: 3600000, // Cleanup old entries every hour
-  MAX_ENTRIES: 10000, // Maximum rate limiter entries to prevent memory exhaustion
-};
-
-// In-memory rate limiter (TODO: Move to Redis for horizontal scaling)
-const rateLimiter = new Map();
-
-// Cleanup interval reference for lifecycle control
-let cleanupIntervalId = null;
 
 // Error codes for message events
 const ERROR_CODES = {
@@ -45,140 +33,6 @@ const ERROR_CODES = {
   RATE_LIMITED: 'RATE_LIMITED',
   DATABASE_ERROR: 'DATABASE_ERROR',
 };
-
-/**
- * Perform cleanup of stale rate limit entries
- */
-function performRateLimitCleanup() {
-  const now = Date.now();
-  for (const [userId, entry] of rateLimiter.entries()) {
-    // Remove entries where window has expired and no penalty active
-    if (
-      now - entry.windowStart > RATE_LIMIT.WINDOW_SIZE_MS &&
-      (!entry.penaltyUntil || now > entry.penaltyUntil)
-    ) {
-      rateLimiter.delete(userId);
-    }
-  }
-  logger.debug('Rate limiter cleanup', { remainingEntries: rateLimiter.size });
-}
-
-/**
- * Start the periodic cleanup interval for rate limiter
- * Call this when initializing the socket server
- */
-function startCleanup() {
-  if (cleanupIntervalId) {
-    return; // Already running
-  }
-  cleanupIntervalId = setInterval(performRateLimitCleanup, RATE_LIMIT.CLEANUP_INTERVAL_MS);
-  logger.info('Rate limiter cleanup started');
-}
-
-/**
- * Stop the periodic cleanup interval
- * Call this during graceful shutdown or in tests
- */
-function stopCleanup() {
-  if (cleanupIntervalId) {
-    clearInterval(cleanupIntervalId);
-    cleanupIntervalId = null;
-    logger.info('Rate limiter cleanup stopped');
-  }
-}
-
-/**
- * Clear all rate limiter entries (useful for testing)
- */
-function clearRateLimiter() {
-  rateLimiter.clear();
-}
-
-// Auto-start cleanup on module load (can be stopped with stopCleanup())
-startCleanup();
-
-/**
- * Create a new rate limit entry for a user
- * @param {number} now - Current timestamp
- * @returns {Object} New rate limit entry
- */
-function createRateLimitEntry(now) {
-  return {
-    count: 0,
-    windowStart: now,
-    burstCount: 0,
-    burstStart: now,
-    penaltyUntil: null,
-  };
-}
-
-/**
- * Check if user is rate limited
- * @param {string} userId - User ID to check
- * @returns {{allowed: boolean, retryAfter?: number}} Rate limit result
- */
-function checkRateLimit(userId) {
-  const now = Date.now();
-  let entry = rateLimiter.get(userId);
-
-  if (!entry) {
-    // Check max entries to prevent memory exhaustion
-    if (rateLimiter.size >= RATE_LIMIT.MAX_ENTRIES) {
-      // Force cleanup before adding new entry
-      performRateLimitCleanup();
-
-      // If still at max, reject new users temporarily
-      if (rateLimiter.size >= RATE_LIMIT.MAX_ENTRIES) {
-        logger.warn('Rate limiter at max capacity', { size: rateLimiter.size });
-        return { allowed: false, retryAfter: 5000 };
-      }
-    }
-    entry = createRateLimitEntry(now);
-    rateLimiter.set(userId, entry);
-  }
-
-  // Check if user is in penalty
-  if (entry.penaltyUntil && now < entry.penaltyUntil) {
-    return { allowed: false, retryAfter: entry.penaltyUntil - now };
-  }
-
-  // Reset window if expired
-  if (now - entry.windowStart > RATE_LIMIT.WINDOW_SIZE_MS) {
-    entry.windowStart = now;
-    entry.count = 0;
-    entry.penaltyUntil = null;
-  }
-
-  // Reset burst window if expired
-  if (now - entry.burstStart > RATE_LIMIT.BURST_WINDOW_MS) {
-    entry.burstStart = now;
-    entry.burstCount = 0;
-  }
-
-  // Check window limit
-  if (entry.count >= RATE_LIMIT.MESSAGES_PER_WINDOW) {
-    entry.penaltyUntil = now + RATE_LIMIT.PENALTY_DURATION_MS;
-    logger.warn('User rate limited (window exceeded)', {
-      userId,
-      count: entry.count,
-      penalty: RATE_LIMIT.PENALTY_DURATION_MS,
-    });
-    return { allowed: false, retryAfter: RATE_LIMIT.PENALTY_DURATION_MS };
-  }
-
-  // Check burst limit
-  if (entry.burstCount >= RATE_LIMIT.BURST_LIMIT) {
-    const retryAfter = RATE_LIMIT.BURST_WINDOW_MS - (now - entry.burstStart);
-    return { allowed: false, retryAfter };
-  }
-
-  // Increment counters
-  entry.count++;
-  entry.burstCount++;
-  rateLimiter.set(userId, entry);
-
-  return { allowed: true };
-}
 
 /**
  * Validate message send data
@@ -488,6 +342,12 @@ async function handleMessageEdit(io, socket, data) {
       updatedAt: updatedMessage.updated_at,
     });
 
+    // Send confirmation to sender
+    socket.emit('message:edit-confirmed', {
+      messageId: updatedMessage.id,
+      editedAt: updatedMessage.updated_at,
+    });
+
     logger.info('Message edited', {
       messageId,
       conversationId,
@@ -576,6 +436,12 @@ async function handleMessageDelete(io, socket, data) {
     io.to(roomName).emit('message:deleted', {
       messageId,
       conversationId,
+    });
+
+    // Send confirmation to sender
+    socket.emit('message:delete-confirmed', {
+      messageId,
+      deletedAt: new Date().toISOString(),
     });
 
     logger.info('Message deleted', {
@@ -909,15 +775,9 @@ module.exports = {
   handleMessageRead,
   handleConversationJoin,
   handleConversationLeave,
-  // Lifecycle control for rate limiter cleanup
-  startCleanup,
-  stopCleanup,
-  clearRateLimiter,
   // Exported for testing
-  checkRateLimit,
   validateMessageSend,
   validateMessageEdit,
   validateMessageDelete,
   ERROR_CODES,
-  RATE_LIMIT,
 };

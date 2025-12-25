@@ -7,10 +7,6 @@ const { verifyAccessToken } = require('../utils/jwt');
 /**
  * Middleware to protect routes - requires valid JWT access token
  * Adds user data to request object if token is valid
- *
- * @param {Object} req - request object
- * @param {Object} res - response object
- * @param {Function} next - next middleware function (callback)
  */
 function requireAuth(req, res, next) {
   try {

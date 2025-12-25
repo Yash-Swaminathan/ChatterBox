@@ -2,6 +2,7 @@ const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const MessageCacheService = require('../services/messageCacheService');
 const logger = require('../utils/logger');
+const { checkRateLimit } = require('../utils/rateLimiter');
 
 /**
  * Message Controller - REST API for message retrieval and status management
@@ -16,9 +17,6 @@ const logger = require('../utils/logger');
 
 /**
  * Get messages for a conversation with delivery status
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
  */
 async function getConversationMessages(req, res) {
   const startTime = Date.now();
@@ -151,9 +149,6 @@ async function getConversationMessages(req, res) {
  *       }
  *     }
  *   }
- *
- * @param {Object} req - Express request
- * @param {Object} res - Express response
  */
 async function getUnreadCounts(req, res) {
   const { userId } = req.user;
@@ -215,7 +210,263 @@ async function getUnreadCounts(req, res) {
   }
 }
 
+/**
+ * Helper function to get error message for error codes
+ * @param {string} code - Error code
+ * @returns {string} Human-readable error message
+ */
+function getErrorMessage(code) {
+  const messages = {
+    MESSAGE_NOT_FOUND: 'Message not found or already deleted',
+    NOT_OWNER: 'You can only edit your own messages',
+    MESSAGE_DELETED: 'Cannot edit deleted messages',
+    EDIT_WINDOW_EXPIRED: 'Messages can only be edited within 15 minutes of creation',
+  };
+  return messages[code] || 'Unknown error';
+}
+
+/**
+ * Update message content (REST endpoint)
+ * PUT /api/messages/:messageId
+ * Body: { content: string }
+ */
+async function updateMessage(req, res) {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.userId;
+
+    // 1. Rate limiting check
+    const rateCheck = checkRateLimit(userId);
+    if (!rateCheck.allowed) {
+      logger.warn('Message edit rate limited', {
+        userId,
+        messageId,
+        retryAfter: rateCheck.retryAfter,
+      });
+
+      return res.status(429).json({
+        success: false,
+        error: {
+          code: 'RATE_LIMITED',
+          message: `Rate limit exceeded. Retry in ${Math.ceil(rateCheck.retryAfter / 1000)}s`,
+          retryAfter: rateCheck.retryAfter,
+        },
+      });
+    }
+
+    // 2. Validate content
+    const validationError = Message.validateContent(content);
+    if (validationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: validationError.includes('empty') ? 'CONTENT_EMPTY' : 'CONTENT_TOO_LONG',
+          message: validationError,
+        },
+      });
+    }
+
+    // 3. Check if message is editable (ownership + time limit)
+    const editCheck = await Message.isEditableByUser(messageId, userId);
+    if (!editCheck.allowed) {
+      const statusCode = editCheck.reason === 'MESSAGE_NOT_FOUND' ? 404 : 403;
+
+      logger.warn('Message edit denied', {
+        userId,
+        messageId,
+        reason: editCheck.reason,
+      });
+
+      return res.status(statusCode).json({
+        success: false,
+        error: {
+          code: editCheck.reason,
+          message: getErrorMessage(editCheck.reason),
+        },
+      });
+    }
+
+    // 4. Update message
+    const updatedMessage = await Message.update(messageId, content);
+
+    if (!updatedMessage) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'MESSAGE_NOT_FOUND',
+          message: 'Message not found or already deleted',
+        },
+      });
+    }
+
+    // 5. Invalidate conversation cache
+    await MessageCacheService.invalidateConversation(editCheck.conversationId);
+
+    // 6. Broadcast Socket.io event
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conversation:${editCheck.conversationId}`).emit('message:edited', {
+        messageId: updatedMessage.id,
+        conversationId: editCheck.conversationId,
+        content: updatedMessage.content,
+        editedAt: updatedMessage.updated_at,
+      });
+    }
+
+    logger.info('Message updated via REST API', {
+      userId,
+      messageId,
+      conversationId: editCheck.conversationId,
+      contentLength: content.trim().length,
+    });
+
+    // 7. Return success
+    return res.status(200).json({
+      success: true,
+      data: {
+        message: updatedMessage,
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating message', {
+      messageId: req.params.messageId,
+      userId: req.user?.userId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Failed to update message',
+      },
+    });
+  }
+}
+
+/**
+ * Delete message (soft delete)
+ * DELETE /api/messages/:messageId
+ */
+async function deleteMessage(req, res) {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.userId;
+
+    // 1. Rate limiting (shared with edit)
+    const rateCheck = checkRateLimit(userId);
+    if (!rateCheck.allowed) {
+      logger.warn('Message delete rate limited', {
+        userId,
+        messageId,
+        retryAfter: rateCheck.retryAfter,
+      });
+
+      return res.status(429).json({
+        success: false,
+        error: {
+          code: 'RATE_LIMITED',
+          message: `Rate limit exceeded. Retry in ${Math.ceil(rateCheck.retryAfter / 1000)}s`,
+          retryAfter: rateCheck.retryAfter,
+        },
+      });
+    }
+
+    // 2. Get message info (atomic check)
+    const msgInfo = await Message.getMessageEditInfo(messageId, userId);
+
+    if (!msgInfo.exists || msgInfo.isDeleted) {
+      logger.warn('Message delete failed - not found', {
+        userId,
+        messageId,
+        exists: msgInfo.exists,
+        isDeleted: msgInfo.isDeleted,
+      });
+
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'MESSAGE_NOT_FOUND',
+          message: 'Message not found or already deleted',
+        },
+      });
+    }
+
+    if (!msgInfo.isOwner) {
+      logger.warn('Message delete denied - not owner', {
+        userId,
+        messageId,
+      });
+
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'NOT_OWNER',
+          message: 'You can only delete your own messages',
+        },
+      });
+    }
+
+    // 3. Soft delete
+    const deleted = await Message.softDelete(messageId);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'MESSAGE_NOT_FOUND',
+          message: 'Message not found or already deleted',
+        },
+      });
+    }
+
+    // 4. Invalidate cache
+    await MessageCacheService.invalidateConversation(msgInfo.conversationId);
+
+    // 5. Broadcast Socket.io event
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conversation:${msgInfo.conversationId}`).emit('message:deleted', {
+        messageId,
+        conversationId: msgInfo.conversationId,
+        deletedAt: new Date().toISOString(),
+      });
+    }
+
+    logger.info('Message deleted via REST API', {
+      userId,
+      messageId,
+      conversationId: msgInfo.conversationId,
+    });
+
+    // 6. Return success
+    return res.status(200).json({
+      success: true,
+      message: 'Message deleted successfully',
+    });
+  } catch (error) {
+    logger.error('Error deleting message', {
+      messageId: req.params.messageId,
+      userId: req.user?.userId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Failed to delete message',
+      },
+    });
+  }
+}
+
 module.exports = {
   getConversationMessages,
   getUnreadCounts,
+  updateMessage,
+  deleteMessage,
 };
