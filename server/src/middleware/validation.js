@@ -364,6 +364,68 @@ function validateMessageDelete(req, res, next) {
   next();
 }
 
+/**
+ * Validate message search request
+ */
+function validateMessageSearch(req, res, next) {
+  const { q, conversationId, limit, cursor, includeDeleted } = req.query;
+  const errors = [];
+
+  // Validate query (required, 1-100 chars after trimming)
+  if (!q) {
+    errors.push('Search query is required');
+  } else if (typeof q !== 'string') {
+    errors.push('Query must be a string');
+  } else {
+    const trimmed = q.trim().replace(/\s+/g, ' ');
+    if (trimmed.length === 0) {
+      errors.push('Query cannot be empty');
+    } else if (trimmed.length < 1) {
+      errors.push('Query must be at least 1 character');
+    }
+  }
+
+  // Validate conversationId (optional UUID)
+  if (conversationId && !isValidUUID(conversationId)) {
+    errors.push('conversationId must be a valid UUID');
+  }
+
+  // Validate limit (optional, 1-100, default 50)
+  if (limit !== undefined) {
+    const limitNum = parseInt(limit, 10);
+    if (isNaN(limitNum)) {
+      errors.push('limit must be a number');
+    } else if (!isInRange(limitNum, 1, 100)) {
+      errors.push('limit must be between 1 and 100');
+    }
+  }
+
+  // Validate cursor (optional, format: ISO-timestamp:uuid)
+  if (cursor) {
+    const cursorRegex = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z:[a-f0-9-]{36}$/;
+    if (!cursorRegex.test(cursor)) {
+      errors.push('Invalid cursor format. Expected: ISO-timestamp:uuid');
+    }
+  }
+
+  // Validate includeDeleted (optional boolean string)
+  if (includeDeleted !== undefined && !isOneOf(includeDeleted, ['true', 'false'])) {
+    errors.push('includeDeleted must be true or false');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: errors[0],
+      },
+    });
+  }
+
+  next();
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -374,4 +436,5 @@ module.exports = {
   validateGetMessages,
   validateMessageEdit,
   validateMessageDelete,
+  validateMessageSearch,
 };
