@@ -601,6 +601,57 @@ async function uploadAvatar(req, res) {
   }
 }
 
+/**
+ * Update user privacy settings
+ * @route PUT /api/users/me/privacy
+ */
+async function updatePrivacySettings(req, res) {
+  try {
+    const userId = req.user.id;
+    const { hide_read_status } = req.body;
+
+    // Validate input
+    if (typeof hide_read_status !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'hide_read_status must be a boolean',
+        },
+      });
+    }
+
+    // Update privacy setting
+    const updatedUser = await User.updateReadReceiptPrivacy(userId, hide_read_status);
+
+    logger.info('Privacy settings updated', {
+      userId,
+      hide_read_status,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        hide_read_status: updatedUser.hide_read_status,
+      },
+      message: 'Privacy settings updated successfully',
+    });
+  } catch (error) {
+    logger.error('Update privacy settings error', {
+      userId: req.user.id,
+      error: error.message,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Failed to update privacy settings',
+      },
+    });
+  }
+}
+
 module.exports = {
   getCurrentUser,
   updateCurrentUser,
@@ -608,4 +659,5 @@ module.exports = {
   searchUsers,
   updateStatus,
   uploadAvatar,
+  updatePrivacySettings,
 };
