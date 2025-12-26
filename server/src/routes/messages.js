@@ -2,7 +2,11 @@ const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/messageController');
 const { requireAuth } = require('../middleware/auth');
-const { validateGetMessages, validateMessageEdit, validateMessageDelete } = require('../middleware/validation');
+const {
+  validateGetMessages,
+  validateMessageEdit,
+  validateMessageDelete,
+} = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
 
 // Rate limiter: 60 requests/minute for message retrieval
