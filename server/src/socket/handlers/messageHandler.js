@@ -1,6 +1,7 @@
 const Message = require('../../models/Message');
 const Conversation = require('../../models/Conversation');
 const MessageStatus = require('../../models/MessageStatus');
+const User = require('../../models/User');
 const MessageCacheService = require('../../services/messageCacheService');
 const logger = require('../../utils/logger');
 const { isValidUUID } = require('../../utils/validators');
@@ -10,10 +11,23 @@ const { checkRateLimit } = require('../../utils/rateLimiter');
  * Message Handler - Socket.io event handlers for real-time messaging
  *
  * TODO: Future Improvements (from Code Review)
- * - Optimize read receipt broadcasting (only send to message sender, not entire room)
+ * - Optimize read receipt broadcasting (only send to message sender, not entire room) ✅ DONE (Week 4)
  * - Batch read status updates (send every 5s instead of immediately)
  * - Add duplicate status update check before DB query
  * - Add Prometheus metrics for message throughput and latency
+ *
+ * TODO (Week 17): Advanced Read Receipt Optimizations
+ * - Implement batching for read receipts (send every 5s instead of immediately)
+ *   Priority: MEDIUM - Reduces socket events by ~90% for active conversations
+ *   Use Redis SET to accumulate read events, flush with setInterval
+ * - Add aggregated read status display for group chats
+ *   Priority: MEDIUM - Show "Seen by Alice, Bob, and 3 others"
+ *   Respect privacy settings (filter users with hide_read_status=TRUE)
+ * - Implement distributed locking for cache population
+ *   Priority: HIGH - Required for horizontal scaling beyond 2 instances
+ *   Use Redis SETNX to prevent race conditions across servers
+ * - Add Prometheus metrics for monitoring
+ *   Priority: LOW - Track read_receipts_sent, privacy_blocks, cache_hit_rate
  *
  * NOTE: Rate limiter moved to shared utility (server/src/utils/rateLimiter.js)
  * - Shared across Socket.io and REST API for consistent rate limiting
@@ -724,18 +738,37 @@ async function handleMessageRead(io, socket, data) {
       return;
     }
 
-    // Broadcast read status to each sender
-    senderIds.forEach(senderId => {
-      io.to(`user:${senderId}`).emit('message:read-status', {
-        userId,
-        status: 'read',
-        timestamp: new Date().toISOString(),
-      });
-    });
+    // Check privacy settings before broadcasting read status
+    const hideReadStatus = await User.getReadReceiptPrivacy(userId);
 
-    // Confirm to client
+    if (hideReadStatus) {
+      // Privacy enabled: don't broadcast read status to senders
+      logger.info('Read receipt privacy enabled, skipping broadcast', {
+        userId,
+        messageCount: data.messageIds ? data.messageIds.length : 'conversation',
+      });
+    } else {
+      // Privacy disabled: broadcast read status to each sender
+      senderIds.forEach(senderId => {
+        io.to(`user:${senderId}`).emit('message:read-status', {
+          userId,
+          status: 'read',
+          timestamp: new Date().toISOString(),
+        });
+      });
+
+      logger.debug('Read receipts broadcasted to senders', {
+        userId,
+        senderCount: senderIds.length,
+      });
+    }
+
+    // Always confirm to the reading user (regardless of privacy setting)
     socket.emit('message:read-confirmed', {
+      conversationId: data.conversationId || null,
+      messageIds: data.messageIds || null,
       updatedCount,
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.error('Error handling message:read', {
