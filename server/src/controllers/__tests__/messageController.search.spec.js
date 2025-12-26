@@ -92,7 +92,7 @@ describe('Message Search API', () => {
     ]);
     await pool.query('DELETE FROM conversations WHERE id = ANY($1)', [testConversations]);
     await pool.query('DELETE FROM users WHERE id = ANY($1)', [testUsers.map(u => u.id)]);
-    await pool.end();
+    // Don't close pool - shared across all tests
   });
 
   describe('1. Basic Search', () => {
