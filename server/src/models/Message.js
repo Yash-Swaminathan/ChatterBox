@@ -484,6 +484,113 @@ class Message {
       createdAt: message.created_at,
     };
   }
+
+  /**
+   * Search messages using PostgreSQL full-text search
+   * Supports both global search and conversation-scoped search
+   * Returns only messages from conversations where user is an active participant
+   *
+   * @param {string} userId - Current user ID (for privacy filtering)
+   * @param {string} query - Search query (1-100 chars)
+   * @param {Object} options - Search options
+   * @param {string} [options.conversationId] - Scope to specific conversation
+   * @param {number} [options.limit=50] - Max results (1-100)
+   * @param {string} [options.cursor] - Cursor for pagination (format: timestamp:messageId)
+   * @param {boolean} [options.includeDeleted=false] - Include soft-deleted messages
+   * @returns {Promise<{messages: Object[], nextCursor: string|null, hasMore: boolean}>}
+   */
+  static async searchMessages(userId, query, options = {}) {
+    const { conversationId = null, limit = 50, cursor = null, includeDeleted = false } = options;
+
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const trimmedQuery = query.trim();
+
+    if (trimmedQuery.length > 100) {
+      logger.warn('Search query truncated', { userId, originalLength: trimmedQuery.length });
+    }
+
+    const searchQuery = trimmedQuery.substring(0, 100);
+
+    let sql = `
+      SELECT
+        m.id,
+        m.conversation_id,
+        m.sender_id,
+        m.content,
+        m.created_at,
+        u.id as sender_id_inner,
+        u.username,
+        u.avatar_url
+      FROM messages m
+      JOIN conversation_participants cp ON m.conversation_id = cp.conversation_id
+      JOIN users u ON m.sender_id = u.id
+      WHERE cp.user_id = $1
+        AND to_tsvector('english', m.content) @@ plainto_tsquery('english', $2)
+    `;
+
+    const params = [userId, searchQuery];
+    let paramIndex = 3;
+
+    if (!includeDeleted) {
+      sql += ' AND m.deleted_at IS NULL';
+    }
+
+    if (conversationId) {
+      sql += ` AND m.conversation_id = $${paramIndex}`;
+      params.push(conversationId);
+      paramIndex++;
+    }
+
+    if (cursor) {
+      const [cursorTimestamp, cursorId] = cursor.split(':');
+      if (cursorTimestamp && cursorId) {
+        sql += ` AND (m.created_at, m.id) < ($${paramIndex}, $${paramIndex + 1})`;
+        params.push(cursorTimestamp, cursorId);
+        paramIndex += 2;
+      }
+    }
+
+    sql += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${paramIndex}`;
+    params.push(safeLimit + 1);
+
+    const result = await pool.query(sql, params);
+
+    const hasMore = result.rows.length > safeLimit;
+    const rawMessages = hasMore ? result.rows.slice(0, safeLimit) : result.rows;
+
+    // Transform raw columns to expected format with sender object
+    const messages = rawMessages.map(row => ({
+      id: row.id,
+      conversation_id: row.conversation_id,
+      sender_id: row.sender_id,
+      content: row.content,
+      created_at: row.created_at,
+      sender: {
+        id: row.sender_id_inner,
+        username: row.username,
+        avatarUrl: row.avatar_url,
+      },
+    }));
+
+    const nextCursor =
+      messages.length > 0 && hasMore
+        ? `${messages[messages.length - 1].created_at.toISOString()}:${messages[messages.length - 1].id}`
+        : null;
+
+    logger.info('Message search completed', {
+      userId,
+      query: searchQuery,
+      conversationId: conversationId || 'global',
+      resultCount: messages.length,
+      hasMore,
+    });
+
+    return {
+      messages,
+      nextCursor,
+      hasMore,
+    };
+  }
 }
 
 module.exports = Message;
