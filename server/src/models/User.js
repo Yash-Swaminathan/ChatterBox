@@ -34,7 +34,8 @@ async function getUserById(userId) {
         updated_at,
         is_active,
         email_verified,
-        phone_verified
+        phone_verified,
+        hide_read_status
       FROM users
       WHERE id = $1 AND is_active = true
     `;
@@ -524,10 +525,86 @@ async function getUserContacts(userId) {
 }
 
 /**
- * Validate UUID format
- * @param {string} uuid - UUID string to validate
- * @returns {boolean} True if valid UUID
+ * Get user's read receipt privacy setting
+ * @param {string} userId - User UUID
+ * @returns {Promise<boolean>} - hide_read_status value (true = privacy enabled)
  */
+async function getReadReceiptPrivacy(userId) {
+  try {
+    // Validate UUID format
+    if (!isValidUUID(userId)) {
+      logger.warn('Invalid UUID format for getReadReceiptPrivacy', { userId });
+      // Fail-safe: default to privacy enabled for invalid input
+      return true;
+    }
+
+    const query = 'SELECT hide_read_status FROM users WHERE id = $1 AND is_active = true';
+    const result = await pool.query(query, [userId]);
+
+    if (result.rows.length === 0) {
+      logger.warn('User not found for getReadReceiptPrivacy', { userId });
+      // Fail-safe: default to privacy enabled for missing user
+      return true;
+    }
+
+    return result.rows[0].hide_read_status;
+  } catch (error) {
+    logger.error('Error in getReadReceiptPrivacy', {
+      userId,
+      error: error.message,
+    });
+    // Fail-safe: default to privacy enabled on errors
+    return true;
+  }
+}
+
+/**
+ * Update user's read receipt privacy setting
+ * @param {string} userId - User UUID
+ * @param {boolean} hideReadStatus - New privacy setting
+ * @returns {Promise<Object>} - Updated user object
+ */
+async function updateReadReceiptPrivacy(userId, hideReadStatus) {
+  try {
+    // Validate UUID format
+    if (!isValidUUID(userId)) {
+      throw new Error('Invalid user ID format');
+    }
+
+    // Validate boolean type
+    if (typeof hideReadStatus !== 'boolean') {
+      throw new Error('hideReadStatus must be a boolean value');
+    }
+
+    const query = `
+      UPDATE users
+      SET hide_read_status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2 AND is_active = true
+      RETURNING id, hide_read_status
+    `;
+
+    const result = await pool.query(query, [hideReadStatus, userId]);
+
+    if (result.rows.length === 0) {
+      throw new Error('User not found or inactive');
+    }
+
+    logger.info('User privacy settings updated', {
+      userId,
+      hide_read_status: hideReadStatus,
+    });
+
+    return result.rows[0];
+  } catch (error) {
+    logger.error('Error in updateReadReceiptPrivacy', {
+      userId,
+      hideReadStatus,
+      error: error.message,
+    });
+    throw error;
+  }
+}
+
 function isValidUUID(uuid) {
   if (!uuid || typeof uuid !== 'string') {
     return false;
@@ -549,5 +626,7 @@ module.exports = {
   checkUserExists,
   getUserByEmail,
   getUserByUsername,
+  getReadReceiptPrivacy,
+  updateReadReceiptPrivacy,
   isValidUUID,
 };
