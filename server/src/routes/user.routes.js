@@ -9,9 +9,6 @@ const { uploadAvatar, handleUploadError, validateFileExists } = require('../midd
 // Rate limiters for user endpoints (disabled in test environment)
 const isTest = process.env.NODE_ENV === 'test';
 
-/**
- * Rate limiters for user endpoints
- */
 const profileUpdateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 updates per 15 minutes
@@ -95,6 +92,14 @@ router.put(
   validateStatusUpdate,
   userController.updateStatus
 );
+
+/**
+ * @route   PUT /api/users/me/privacy
+ * @desc    Update current authenticated user's privacy settings
+ * @access  Protected
+ * @body    { hide_read_status: boolean }
+ */
+router.put('/me/privacy', requireAuth, profileUpdateLimiter, userController.updatePrivacySettings);
 
 /**
  * @route   PUT /api/users/me/avatar
