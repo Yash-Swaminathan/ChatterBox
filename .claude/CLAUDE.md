@@ -25,7 +25,7 @@
 
 ### **Current Status**
 - **Phase**: PHASE 3 - Enhanced Messaging & Deployment Acceleration (Weeks 5-10)
-- **Current Task**: Week 6: Contact System Foundation - 🆕 NEXT UP
+- **Current Task**: Week 6: Contact System Foundation - Day 1 ✅ COMPLETED
 - **Week 1 Completion**: 100% ✅
 - **Week 2 Completion**: 100% ✅
 - **Week 3 Completion**: 100% ✅ (All days complete + code review improvements)
@@ -37,13 +37,45 @@
   - Day 1-2: Message Editing & Deletion ✅
   - Day 3: Read Receipts Enhancement ✅
   - Day 4-5: Message Search & Optimization ✅
-- **Overall Completion**: Weeks 1-5 Complete ✅
-- **Test Status**: 445 tests total (441 passing, 4 skipped) - 99.1% pass rate ✅
+- **Week 6 Completion**: 33% (Day 1 complete, Days 2-3 pending)
+  - Day 1: Contact CRUD ✅
+- **Overall Completion**: Weeks 1-5 Complete ✅, Week 6 in progress
+- **Test Status**: 518 tests total (514 passing, 4 skipped) - 99.2% pass rate ✅
 - **Code Quality**: 0 ESLint errors, 8 warnings ✅
 - **🎯 Week 10 Goal**: Production deployment with group messaging, contacts, and minimal frontend
-- **📊 Post-Launch**: Weeks 11-16 for file attachments, advanced features, and optimizations
+- **📊 Post-Launch**: Weeks 11-18 for file attachments, advanced features, and friend request system
 
-**Latest Implementation - Week 5 Day 4-5: Message Search & Optimization (COMPLETED 2025-12-26)**
+**Latest Implementation - Week 6 Day 1: Contact CRUD (COMPLETED 2025-12-27)**
+- ✅ Database migration: 011_create_contacts.sql with proper schema
+  - UUID primary key with gen_random_uuid()
+  - Foreign keys to users table with CASCADE delete
+  - UNIQUE constraint on (user_id, contact_user_id)
+  - CHECK constraint for self-contact prevention
+  - 4 indexes for efficient queries (user_id, contact_user_id, blocked, favorite)
+- ✅ Contact.js model with 11 CRUD methods
+  - create (idempotent with ON CONFLICT), findById, findByUser
+  - isContact, countByUser, updateNickname, toggleFavorite
+  - deleteContact, deleteByUsers, exists, getContactDetails
+  - Graceful error handling for missing table (42P01)
+- ✅ contactController.js with 5 handler functions
+  - addContact (validates not self, verifies user exists, returns 201/200)
+  - removeContact (ownership validation)
+  - listContacts (pagination with limit/offset, includeBlocked flag)
+  - checkContactExists (returns boolean + contactId)
+  - updateContact (nickname, isFavorite)
+- ✅ contacts.js routes with rate limiting
+  - POST /api/contacts (30 req/15min)
+  - GET /api/contacts (120 req/15min)
+  - GET /api/contacts/exists/:userId
+  - PUT /api/contacts/:contactId
+  - DELETE /api/contacts/:contactId
+- ✅ Validation middleware: validateAddContact, validateUpdateContact, validateGetContacts, validateUUID
+- ✅ 73 tests passing (41 model + 32 controller)
+- ✅ Edge cases covered: duplicate prevention, self-contact, non-existent user, pagination limits
+- ✅ One-way contact relationships (like Twitter follows, not Facebook friends)
+- ✅ Friend request system deferred to Week 18 (see Post-Launch Roadmap)
+
+**Previous Implementation - Week 5 Day 4-5: Message Search & Optimization (COMPLETED 2025-12-26)**
 - ✅ PostgreSQL full-text search with GIN indexing
 - ✅ Global search across all user conversations
 - ✅ Conversation-scoped search with conversationId filter
@@ -105,7 +137,64 @@
 
 ---
 
-### 🚀 WEEK 5: Enhanced Messaging (7 hours → 4 hours aggressive)
+## 🎯 CURRENT WEEK: WEEK 6 - Contact System Foundation
+
+### 🚀 WEEK 6: Contact System Foundation (7 hours → 3 hours aggressive)
+
+**Day 1: Contact CRUD (1.5 hours)** - ✅ COMPLETED
+- [x] Created contacts table with migration 011_create_contacts.sql
+- [x] POST /api/contacts - Add contact by userId (idempotent)
+- [x] DELETE /api/contacts/:contactId - Remove contact
+- [x] GET /api/contacts - List user's contacts with pagination
+- [x] GET /api/contacts/exists/:userId - Check if contact exists
+- [x] PUT /api/contacts/:contactId - Update nickname and favorite status
+- [x] Tests: 73 tests passing (41 model + 32 controller)
+- [x] Edge cases: duplicate prevention, self-contact, non-existent user, pagination limits
+
+**Day 2: Contact Blocking (1 hour)**
+- [ ] PUT /api/contacts/:contactId/block - Block contact
+- [ ] PUT /api/contacts/:contactId/unblock - Unblock
+- [ ] Prevent messaging from blocked users (middleware)
+- [ ] Filter blocked users from search results
+- [ ] Tests: block prevents messaging, search filtering
+
+**Day 3: Contact Discovery (0.5 hours)**
+- [ ] Enhance GET /api/users/search to exclude existing contacts
+- [ ] Add filter: ?excludeContacts=true
+- [ ] Optimize with NOT EXISTS subquery
+- [ ] Tests: search excludes contacts correctly
+
+**Key Simplification**: Skip contact requests/friend requests system
+
+**Why Skip Now (Week 6)**:
+- Week 6 focus is core contact management, not social features
+- Instant contact addition is simpler for MVP (like Twitter follows)
+- Week 10 deployment doesn't require friend requests
+- Allows faster iteration to production deployment
+
+**When to Add**: Week 18 (see Post-Launch Roadmap below)
+- Full friend request system with Socket.io notifications
+- Mutual contact suggestions (friend-of-friend algorithm)
+- Backward compatible with Week 6 instant-add contacts
+- Shows iterative development on resume
+
+**Design Decision**: One-way contacts (A adds B without B's consent)
+- User A can add User B without notification
+- User B can independently add User A (creates second row)
+- Mutual/bidirectional contacts added in Week 18
+
+**Deliverables:**
+- Full contact management (add/remove/block)
+- Blocked user enforcement
+- Optimized contact discovery
+
+**✅ Milestone 6**: Complete contact management system
+
+---
+
+## 📋 COMPLETED WEEKS
+
+### 🚀 WEEK 5: Enhanced Messaging (7 hours → 4 hours aggressive) - ✅ COMPLETED
 
 **Day 1-2: Message Editing & Deletion (2 hours → 1.5 hours)** - ✅ COMPLETED
 - [x] REST endpoints: PUT /api/messages/:messageId, DELETE /api/messages/:messageId
@@ -219,39 +308,6 @@ SELECT m.created_at FROM messages m...
 - Remove references to `edited_at` and `left_at` from search query
 - Document that these columns need migrations in future weeks
 - Tests should pass once query only uses existing columns
-
----
-
-### 🚀 WEEK 6: Contact System Foundation (7 hours → 3 hours aggressive)
-
-**Day 1: Contact CRUD (1.5 hours)**
-- [ ] Contacts table already exists (from schema)
-- [ ] POST /api/contacts - Add contact by userId
-- [ ] DELETE /api/contacts/:contactId - Remove contact
-- [ ] GET /api/contacts - List user's contacts with pagination
-- [ ] Tests: add/remove, duplicate prevention, pagination
-
-**Day 2: Contact Blocking (1 hour)**
-- [ ] PUT /api/contacts/:contactId/block - Block contact
-- [ ] PUT /api/contacts/:contactId/unblock - Unblock
-- [ ] Prevent messaging from blocked users (middleware)
-- [ ] Filter blocked users from search results
-- [ ] Tests: block prevents messaging, search filtering
-
-**Day 3: Contact Discovery (0.5 hours)**
-- [ ] Enhance GET /api/users/search to exclude existing contacts
-- [ ] Add filter: ?excludeContacts=true
-- [ ] Optimize with NOT EXISTS subquery
-- [ ] Tests: search excludes contacts correctly
-
-**Key Simplification**: Skip contact requests/friend requests system (can add post-launch)
-
-**Deliverables:**
-- Full contact management (add/remove/block)
-- Blocked user enforcement
-- Optimized contact discovery
-
-**✅ Milestone 6**: Complete contact management system
 
 ---
 
@@ -3489,6 +3545,116 @@ chatterbox/
 - Multi-server deployment tested
 
 **✅ Milestone 16**: **PRODUCTION-READY AT SCALE! 🚀**
+
+---
+
+### 🚀 WEEK 18: Social Features & Contact Enhancements (7 hours)
+
+**Goal**: Add friend request system and enhance contact management with mutual consent workflow
+
+**Deferred from Week 6**: Week 6 used instant contact addition for MVP. Now add production-grade friend request system.
+
+**Day 1: Contact Request Database & Model (1 hour)**
+- [ ] Create contact_requests table (migration 020)
+  - Columns: id, from_user_id, to_user_id, status, message, created_at, responded_at
+  - UNIQUE constraint on (from_user_id, to_user_id)
+  - CHECK constraints for self-request prevention and status validation
+  - 3 indexes for efficient queries
+- [ ] Create ContactRequest.js model (8 methods)
+  - create, findById, findByUser, accept, reject, cancel, exists, countPending
+  - Pattern: Follow Contact.js structure
+- [ ] Write 25+ model tests
+  - Duplicate prevention, self-request prevention, cascade delete
+  - Accept creates bidirectional contacts (A→B and B→A)
+
+**Day 2: Contact Request Endpoints & Socket Events (1.5 hours)**
+- [ ] POST /api/contact-requests - Send friend request
+  - Body: { toUserId: string, message?: string }
+  - Validation: not self, not already contacts, not blocked
+  - Rate limiting: 20 requests per 15 minutes
+- [ ] GET /api/contact-requests?type=received|sent&status=pending
+  - Pagination with limit/offset
+  - Include sender/recipient profile data
+- [ ] PUT /api/contact-requests/:requestId/accept
+  - Create bidirectional contact entries
+  - Socket.io: Emit contact:request-accepted to sender
+  - Delete request after acceptance
+- [ ] PUT /api/contact-requests/:requestId/reject
+  - Socket.io: Emit contact:request-rejected to sender
+  - Mark status='rejected', auto-delete after 30 days
+- [ ] DELETE /api/contact-requests/:requestId/cancel
+  - Sender can cancel pending request
+- [ ] Socket.io events (4 new events)
+  - contact:request-received (notify recipient)
+  - contact:request-accepted (notify sender)
+  - contact:request-rejected (notify sender)
+  - contact:request-cancelled (notify both)
+- [ ] Write 30+ integration tests
+  - All endpoints, Socket.io events, edge cases
+
+**Day 3-4: Migration Path & Frontend UI (1.5 hours)**
+- [ ] Update POST /api/contacts endpoint
+  - Option 1: Deprecate (return 410 Gone)
+  - Option 2: Admin-only (for testing)
+  - Option 3: Auto-convert to request workflow
+  - **Recommendation**: Option 1 (deprecate)
+- [ ] Backward compatibility tests
+  - Existing contacts from Week 6-10 continue working
+  - No retroactive request creation needed
+- [ ] Frontend: Request workflow UI
+  - Change "Add Contact" → "Send Request" button
+  - Pending requests badge in sidebar
+  - Notification bell for new requests
+  - Accept/Reject buttons in request list
+  - Request message display
+
+**Day 5-6: Mutual Contact Suggestions (2 hours)**
+- [ ] Enhance GET /api/contacts/suggestions endpoint
+  - Algorithm: Friends of friends (mutual contacts)
+  - SQL: Use INTERSECT or JOIN on contacts table
+  - Exclude: Already contacts, blocked users, pending requests
+  - Limit: 20 suggestions, randomize order
+  - Cache in Redis (TTL: 1 hour)
+- [ ] GET /api/contacts/:contactId/mutual endpoint
+  - Return list of mutual contacts with profiles
+  - Pagination: limit, offset
+- [ ] Add mutual contact count to user profiles
+  - Display: "X mutual contacts" on profile view
+  - Cache result in Redis (TTL: 5 minutes)
+- [ ] Frontend: Mutual contacts display
+  - Show avatars/names of mutual connections
+  - Click to expand full list
+  - Integrate into friend request flow
+
+**Day 7: Notification System Polish (1 hour)**
+- [ ] Batch notification delivery
+  - Group multiple requests into single notification
+  - "Alice and 3 others sent you contact requests"
+- [ ] Request expiry system
+  - Background job: Delete rejected requests after 30 days
+  - Background job: Auto-reject requests after 90 days
+  - Cron job using node-cron package
+- [ ] Analytics tracking
+  - Acceptance rate (accepted / sent)
+  - Average response time
+  - Log to Winston for analysis
+
+**Resume Bullets:**
+- "Built friend request system with mutual consent workflow, processing 500+ requests daily with Socket.io real-time notifications"
+- "Implemented backward-compatible database migration, preserving 1000+ existing contacts while enabling new request-based workflow"
+- "Designed friend-of-friend suggestion algorithm, improving contact discovery by 60% through social graph analysis"
+
+**Deliverables:**
+- contact_requests table with 3 indexes
+- ContactRequest model with 8 methods
+- 5 new REST endpoints (send, list, accept, reject, cancel)
+- 4 Socket.io events for real-time notifications
+- 55+ tests passing (25 model + 30 controller)
+- Backward compatibility with Week 6 contacts
+- Friend suggestion algorithm
+- Notification batching system
+
+**✅ Milestone 17**: Friend request system with mutual consent and social suggestions
 
 ---
 
