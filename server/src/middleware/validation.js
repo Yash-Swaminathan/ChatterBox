@@ -453,10 +453,16 @@ function validateAddContact(req, res, next) {
   if (nickname !== undefined && nickname !== null) {
     if (typeof nickname !== 'string') {
       errors.push('nickname must be a string');
-    } else if (nickname.trim().length === 0) {
-      errors.push('nickname cannot be empty');
-    } else if (nickname.length > 100) {
-      errors.push('nickname must be 100 characters or less');
+    } else {
+      const trimmedNickname = nickname.trim();
+      if (trimmedNickname.length === 0) {
+        errors.push('nickname cannot be empty or whitespace only');
+      } else if (trimmedNickname.length > 100) {
+        errors.push('nickname must be 100 characters or less');
+      } else {
+        // Update request body with trimmed value
+        req.body.nickname = trimmedNickname;
+      }
     }
   }
 
@@ -486,10 +492,16 @@ function validateUpdateContact(req, res, next) {
   if (nickname !== undefined && nickname !== null) {
     if (typeof nickname !== 'string') {
       errors.push('nickname must be a string');
-    } else if (nickname.trim().length === 0) {
-      errors.push('nickname cannot be empty');
-    } else if (nickname.length > 100) {
-      errors.push('nickname must be 100 characters or less');
+    } else {
+      const trimmedNickname = nickname.trim();
+      if (trimmedNickname.length === 0) {
+        errors.push('nickname cannot be empty or whitespace only');
+      } else if (trimmedNickname.length > 100) {
+        errors.push('nickname must be 100 characters or less');
+      } else {
+        // Update request body with trimmed value
+        req.body.nickname = trimmedNickname;
+      }
     }
   }
 

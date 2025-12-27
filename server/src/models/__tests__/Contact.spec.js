@@ -111,14 +111,13 @@ describe('Contact Model', () => {
       expect(result.nickname).toBeNull();
     });
 
-    it('should return null if missing contacts table (graceful degradation)', async () => {
+    it('should throw error if missing contacts table', async () => {
       const error = new Error('Table does not exist');
       error.code = '42P01';
       pool.query = jest.fn().mockRejectedValue(error);
 
-      const result = await Contact.create('user-1', 'user-2');
-
-      expect(result).toBeNull();
+      await expect(Contact.create('user-1', 'user-2'))
+        .rejects.toThrow('Database schema not initialized. Please run migrations.');
     });
 
     it('should handle database errors gracefully', async () => {

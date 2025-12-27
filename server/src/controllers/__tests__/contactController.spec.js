@@ -407,7 +407,7 @@ describe('Contact Controller Integration Tests', () => {
         .expect(403);
 
       expect(response.body.error).toBe('Forbidden');
-      expect(response.body.message).toContain('permission');
+      expect(response.body.message).toBe('Forbidden: You do not own this contact');
     });
 
     it('should validate contactId format (UUID)', async () => {

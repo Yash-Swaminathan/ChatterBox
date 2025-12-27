@@ -117,7 +117,7 @@ async function removeContact(req, res) {
     if (contact.userId !== currentUserId) {
       return res.status(403).json({
         error: 'Forbidden',
-        message: 'You do not have permission to remove this contact',
+        message: 'Forbidden: You do not own this contact',
       });
     }
 
@@ -302,7 +302,7 @@ async function updateContact(req, res) {
     if (contact.userId !== currentUserId) {
       return res.status(403).json({
         error: 'Forbidden',
-        message: 'You do not have permission to update this contact',
+        message: 'Forbidden: You do not own this contact',
       });
     }
 

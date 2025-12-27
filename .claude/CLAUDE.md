@@ -2093,19 +2093,84 @@ Response: { status: string }
 #### Contact Management Endpoints
 
 ```
-GET    /api/contacts?limit={number}&offset={number}
-Response: { contacts: Contact[], total: number }
+GET    /api/contacts?limit={number}&offset={number}&includeBlocked={boolean}
+Response: {
+  success: true,
+  data: {
+    contacts: Contact[],
+    pagination: {
+      total: number,
+      limit: number,
+      offset: number,
+      hasMore: boolean
+    }
+  }
+}
 
 POST   /api/contacts
 Body: { userId: string, nickname?: string }
-Response: { contact: Contact }
+Response (201 Created): {
+  success: true,
+  data: {
+    contact: {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      userId: "current-user-id",
+      contactUserId: "550e8400-e29b-41d4-a716-446655440001",
+      nickname: "Best Friend",
+      isBlocked: false,
+      isFavorite: false,
+      addedAt: "2025-12-27T22:45:52Z",
+      user: {
+        id: "550e8400-e29b-41d4-a716-446655440001",
+        username: "alice",
+        email: "alice@example.com",
+        displayName: "Alice Smith",
+        avatarUrl: "https://..."
+      }
+    },
+    created: true
+  }
+}
+Response (200 OK - already exists): {
+  success: true,
+  data: {
+    contact: { ... },
+    created: false
+  }
+}
 
-DELETE /api/contacts/:contactId
-Response: { message: "Contact removed" }
+GET    /api/contacts/exists/:userId
+Response: {
+  success: true,
+  data: {
+    exists: true,
+    contactId: "550e8400-e29b-41d4-a716-446655440002"
+  }
+}
 
 PUT    /api/contacts/:contactId
-Body: { nickname?: string, is_favorite?: boolean }
-Response: { contact: Contact }
+Body: { nickname?: string, isFavorite?: boolean }
+Response: {
+  success: true,
+  data: {
+    contact: {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      userId: "current-user-id",
+      contactUserId: "contact-user-id",
+      nickname: "Updated Nickname",
+      isBlocked: false,
+      isFavorite: true,
+      addedAt: "2025-12-27T22:45:52Z",
+      user: { ... }
+    }
+  }
+}
+
+DELETE /api/contacts/:contactId
+Response: {
+  success: true,
+  message: "Contact removed successfully"
+}
 
 POST   /api/contacts/:contactId/block
 Response: { message: "Contact blocked" }
@@ -2125,6 +2190,41 @@ Response: { contact: Contact }
 
 PUT    /api/contact-requests/:requestId/reject
 Response: { message: "Request rejected" }
+```
+
+**Error Responses:**
+```json
+// 400 Bad Request - Validation Error
+{
+  "error": "Validation Error",
+  "message": "userId must be a valid UUID"
+}
+
+// 401 Unauthorized - Missing/Invalid Token
+{
+  "error": {
+    "code": "NO_TOKEN",
+    "message": "No authentication token provided"
+  }
+}
+
+// 403 Forbidden - Ownership Violation
+{
+  "error": "Forbidden",
+  "message": "Forbidden: You do not own this contact"
+}
+
+// 404 Not Found
+{
+  "error": "Not Found",
+  "message": "Contact not found"
+}
+
+// 500 Internal Server Error
+{
+  "error": "Internal Server Error",
+  "message": "Failed to add contact"
+}
 ```
 
 #### Conversation Endpoints

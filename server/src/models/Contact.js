@@ -63,8 +63,12 @@ async function create(userId, contactUserId, nickname = null) {
     }
 
     if (error.code === '42P01') { // Table does not exist
-      logger.error('Contacts table does not exist', { error: error.message });
-      return null; // Graceful degradation
+      logger.error('Contacts table missing during create operation', {
+        userId,
+        contactUserId,
+        error: error.message
+      });
+      throw new Error('Database schema not initialized. Please run migrations.');
     }
 
     logger.error('Error creating contact', { error: error.message, userId, contactUserId });
