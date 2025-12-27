@@ -435,6 +435,157 @@ function validateMessageSearch(req, res, next) {
   next();
 }
 
+/**
+ * Validate add contact request
+ */
+function validateAddContact(req, res, next) {
+  const { userId, nickname } = req.body;
+  const errors = [];
+
+  // Validate userId (required, UUID)
+  if (!userId) {
+    errors.push('userId is required');
+  } else if (!isValidUUID(userId)) {
+    errors.push('userId must be a valid UUID');
+  }
+
+  // Validate nickname (optional, max 100 chars)
+  if (nickname !== undefined && nickname !== null) {
+    if (typeof nickname !== 'string') {
+      errors.push('nickname must be a string');
+    } else {
+      const trimmedNickname = nickname.trim();
+      if (trimmedNickname.length === 0) {
+        errors.push('nickname cannot be empty or whitespace only');
+      } else if (trimmedNickname.length > 100) {
+        errors.push('nickname must be 100 characters or less');
+      } else {
+        // Update request body with trimmed value
+        req.body.nickname = trimmedNickname;
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: errors[0],
+    });
+  }
+
+  next();
+}
+
+/**
+ * Validate update contact request
+ */
+function validateUpdateContact(req, res, next) {
+  const { nickname, isFavorite } = req.body;
+  const errors = [];
+
+  // At least one field must be provided
+  if (nickname === undefined && isFavorite === undefined) {
+    errors.push('At least one field (nickname or isFavorite) must be provided');
+  }
+
+  // Validate nickname if provided
+  if (nickname !== undefined && nickname !== null) {
+    if (typeof nickname !== 'string') {
+      errors.push('nickname must be a string');
+    } else {
+      const trimmedNickname = nickname.trim();
+      if (trimmedNickname.length === 0) {
+        errors.push('nickname cannot be empty or whitespace only');
+      } else if (trimmedNickname.length > 100) {
+        errors.push('nickname must be 100 characters or less');
+      } else {
+        // Update request body with trimmed value
+        req.body.nickname = trimmedNickname;
+      }
+    }
+  }
+
+  // Validate isFavorite if provided
+  if (isFavorite !== undefined && isFavorite !== null) {
+    if (typeof isFavorite !== 'boolean') {
+      errors.push('isFavorite must be a boolean');
+    }
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: errors[0],
+    });
+  }
+
+  next();
+}
+
+/**
+ * Validate get contacts query parameters
+ */
+function validateGetContacts(req, res, next) {
+  const { limit, offset, includeBlocked } = req.query;
+  const errors = [];
+
+  // Validate limit (optional, 1-200)
+  if (limit !== undefined) {
+    const limitNum = parseInt(limit, 10);
+    if (isNaN(limitNum) || !isInRange(limitNum, 1, 200)) {
+      errors.push('limit must be a number between 1 and 200');
+    }
+  }
+
+  // Validate offset (optional, >= 0)
+  if (offset !== undefined) {
+    const offsetNum = parseInt(offset, 10);
+    if (isNaN(offsetNum) || offsetNum < 0) {
+      errors.push('offset must be a non-negative number');
+    }
+  }
+
+  // Validate includeBlocked (optional boolean string)
+  if (includeBlocked !== undefined && !isOneOf(includeBlocked, ['true', 'false'])) {
+    errors.push('includeBlocked must be true or false');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: errors[0],
+    });
+  }
+
+  next();
+}
+
+/**
+ * Generic UUID validator middleware factory
+ * Returns middleware that validates a parameter is a valid UUID
+ */
+function validateUUID(paramName) {
+  return function (req, res, next) {
+    const value = req.params[paramName];
+
+    if (!value) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: `${paramName} is required`,
+      });
+    }
+
+    if (!isValidUUID(value)) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: `${paramName} must be a valid UUID`,
+      });
+    }
+
+    next();
+  };
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -446,4 +597,8 @@ module.exports = {
   validateMessageEdit,
   validateMessageDelete,
   validateMessageSearch,
+  validateAddContact,
+  validateUpdateContact,
+  validateGetContacts,
+  validateUUID,
 };
