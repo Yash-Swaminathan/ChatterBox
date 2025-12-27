@@ -10,10 +10,11 @@ module.exports = {
   moduleNameMapper: {
     '^minio$': '<rootDir>/src/__mocks__/minio.js',
   },
-  // Clear mocks between tests
+  // Clear mock call history between tests, but preserve implementations
   clearMocks: true,
-  resetMocks: true,
-  restoreMocks: true,
+  // Don't reset mock implementations - our __mocks__ files need to keep their mockResolvedValue
+  resetMocks: false,
+  restoreMocks: false,
   // Setup files to run before tests
   setupFiles: ['<rootDir>/jest.setup.js'],
 };

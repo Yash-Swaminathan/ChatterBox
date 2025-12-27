@@ -7,6 +7,12 @@ const matcher = new RegExpMatcher({
   ...englishRecommendedTransformers,
 });
 
+// Constants for message search validation
+const SEARCH_QUERY_MIN_LENGTH = 1;
+const SEARCH_QUERY_MAX_LENGTH = 100;
+const SEARCH_LIMIT_MIN = 1;
+const SEARCH_LIMIT_MAX = 100;
+
 /**
  * Validate registration input
  */
@@ -380,8 +386,10 @@ function validateMessageSearch(req, res, next) {
     const trimmed = q.trim().replace(/\s+/g, ' ');
     if (trimmed.length === 0) {
       errors.push('Query cannot be empty');
-    } else if (trimmed.length < 1) {
-      errors.push('Query must be at least 1 character');
+    } else if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
+      errors.push(`Query must be at least ${SEARCH_QUERY_MIN_LENGTH} character`);
+    } else if (trimmed.length > SEARCH_QUERY_MAX_LENGTH) {
+      errors.push(`Query must be ${SEARCH_QUERY_MAX_LENGTH} characters or less`);
     }
   }
 
@@ -395,14 +403,15 @@ function validateMessageSearch(req, res, next) {
     const limitNum = parseInt(limit, 10);
     if (isNaN(limitNum)) {
       errors.push('limit must be a number');
-    } else if (!isInRange(limitNum, 1, 100)) {
-      errors.push('limit must be between 1 and 100');
+    } else if (!isInRange(limitNum, SEARCH_LIMIT_MIN, SEARCH_LIMIT_MAX)) {
+      errors.push(`limit must be between ${SEARCH_LIMIT_MIN} and ${SEARCH_LIMIT_MAX}`);
     }
   }
 
   // Validate cursor (optional, format: ISO-timestamp:uuid)
   if (cursor) {
-    const cursorRegex = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z:[a-f0-9-]{36}$/;
+    // Strict ISO 8601 format with milliseconds + UUID v4
+    const cursorRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z:[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
     if (!cursorRegex.test(cursor)) {
       errors.push('Invalid cursor format. Expected: ISO-timestamp:uuid');
     }

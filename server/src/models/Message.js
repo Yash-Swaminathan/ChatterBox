@@ -503,13 +503,7 @@ class Message {
     const { conversationId = null, limit = 50, cursor = null, includeDeleted = false } = options;
 
     const safeLimit = Math.min(Math.max(1, limit), 100);
-    const trimmedQuery = query.trim();
-
-    if (trimmedQuery.length > 100) {
-      logger.warn('Search query truncated', { userId, originalLength: trimmedQuery.length });
-    }
-
-    const searchQuery = trimmedQuery.substring(0, 100);
+    const searchQuery = query.trim();
 
     let sql = `
       SELECT
@@ -542,7 +536,11 @@ class Message {
     }
 
     if (cursor) {
-      const [cursorTimestamp, cursorId] = cursor.split(':');
+      const parts = cursor.split(':');
+      if (parts.length !== 2) {
+        throw new Error('Invalid cursor format. Expected: timestamp:uuid');
+      }
+      const [cursorTimestamp, cursorId] = parts;
       if (cursorTimestamp && cursorId) {
         sql += ` AND (m.created_at, m.id) < ($${paramIndex}, $${paramIndex + 1})`;
         params.push(cursorTimestamp, cursorId);
@@ -553,7 +551,12 @@ class Message {
     sql += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${paramIndex}`;
     params.push(safeLimit + 1);
 
-    const result = await pool.query(sql, params);
+    // Execute query with 5-second timeout to prevent slow queries from blocking
+    const result = await pool.query({
+      text: sql,
+      values: params,
+      statement_timeout: 5000, // 5 seconds
+    });
 
     const hasMore = result.rows.length > safeLimit;
     const rawMessages = hasMore ? result.rows.slice(0, safeLimit) : result.rows;
