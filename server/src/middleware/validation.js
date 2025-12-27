@@ -7,6 +7,12 @@ const matcher = new RegExpMatcher({
   ...englishRecommendedTransformers,
 });
 
+// Constants for message search validation
+const SEARCH_QUERY_MIN_LENGTH = 1;
+const SEARCH_QUERY_MAX_LENGTH = 100;
+const SEARCH_LIMIT_MIN = 1;
+const SEARCH_LIMIT_MAX = 100;
+
 /**
  * Validate registration input
  */
@@ -364,6 +370,71 @@ function validateMessageDelete(req, res, next) {
   next();
 }
 
+/**
+ * Validate message search request
+ */
+function validateMessageSearch(req, res, next) {
+  const { q, conversationId, limit, cursor, includeDeleted } = req.query;
+  const errors = [];
+
+  // Validate query (required, 1-100 chars after trimming)
+  if (!q) {
+    errors.push('Search query is required');
+  } else if (typeof q !== 'string') {
+    errors.push('Query must be a string');
+  } else {
+    const trimmed = q.trim().replace(/\s+/g, ' ');
+    if (trimmed.length === 0) {
+      errors.push('Query cannot be empty');
+    } else if (trimmed.length < SEARCH_QUERY_MIN_LENGTH) {
+      errors.push(`Query must be at least ${SEARCH_QUERY_MIN_LENGTH} character`);
+    } else if (trimmed.length > SEARCH_QUERY_MAX_LENGTH) {
+      errors.push(`Query must be ${SEARCH_QUERY_MAX_LENGTH} characters or less`);
+    }
+  }
+
+  // Validate conversationId (optional UUID)
+  if (conversationId && !isValidUUID(conversationId)) {
+    errors.push('conversationId must be a valid UUID');
+  }
+
+  // Validate limit (optional, 1-100, default 50)
+  if (limit !== undefined) {
+    const limitNum = parseInt(limit, 10);
+    if (isNaN(limitNum)) {
+      errors.push('limit must be a number');
+    } else if (!isInRange(limitNum, SEARCH_LIMIT_MIN, SEARCH_LIMIT_MAX)) {
+      errors.push(`limit must be between ${SEARCH_LIMIT_MIN} and ${SEARCH_LIMIT_MAX}`);
+    }
+  }
+
+  // Validate cursor (optional, format: ISO-timestamp:uuid)
+  if (cursor) {
+    // Strict ISO 8601 format with milliseconds + UUID v4
+    const cursorRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z:[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+    if (!cursorRegex.test(cursor)) {
+      errors.push('Invalid cursor format. Expected: ISO-timestamp:uuid');
+    }
+  }
+
+  // Validate includeDeleted (optional boolean string)
+  if (includeDeleted !== undefined && !isOneOf(includeDeleted, ['true', 'false'])) {
+    errors.push('includeDeleted must be true or false');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: errors[0],
+      },
+    });
+  }
+
+  next();
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -374,4 +445,5 @@ module.exports = {
   validateGetMessages,
   validateMessageEdit,
   validateMessageDelete,
+  validateMessageSearch,
 };

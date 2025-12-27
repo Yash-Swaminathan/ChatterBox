@@ -1,3 +1,6 @@
+// Use real presenceService module for unit testing (not the global mock)
+jest.unmock('../presenceService');
+
 const presenceService = require('../presenceService');
 const { redisClient } = require('../../config/redis');
 const { pool } = require('../../config/database');

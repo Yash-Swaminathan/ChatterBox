@@ -464,9 +464,78 @@ async function deleteMessage(req, res) {
   }
 }
 
+/**
+ * Search messages across conversations using full-text search
+ */
+async function searchMessages(req, res) {
+  const startTime = Date.now();
+  const { userId } = req.user;
+  const { q, conversationId, limit, cursor, includeDeleted } = req.query;
+
+  try {
+    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    const parsedIncludeDeleted = includeDeleted === 'true';
+
+    const result = await Message.searchMessages(userId, q, {
+      conversationId: conversationId || null,
+      limit: parsedLimit,
+      cursor: cursor || null,
+      includeDeleted: parsedIncludeDeleted,
+    });
+
+    const executionTime = Date.now() - startTime;
+
+    logger.info('Message search', {
+      userId,
+      query: q,
+      conversationId: conversationId || 'global',
+      resultCount: result.messages.length,
+      executionTime: `${executionTime}ms`,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        messages: result.messages,
+        nextCursor: result.nextCursor,
+        hasMore: result.hasMore,
+        query: q,
+        conversationId: conversationId || null,
+      },
+    });
+  } catch (error) {
+    logger.error('Error searching messages', {
+      userId,
+      query: q,
+      conversationId: conversationId || 'global',
+      error: error.message,
+      stack: error.stack,
+    });
+
+    if (error.message && error.message.includes('timeout')) {
+      return res.status(504).json({
+        success: false,
+        error: {
+          code: 'TIMEOUT',
+          message: 'Search query timed out',
+        },
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'DATABASE_ERROR',
+        message: 'Failed to search messages',
+      },
+    });
+  }
+}
+
 module.exports = {
   getConversationMessages,
   getUnreadCounts,
   updateMessage,
   deleteMessage,
+  searchMessages,
 };

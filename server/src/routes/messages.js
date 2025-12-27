@@ -6,6 +6,7 @@ const {
   validateGetMessages,
   validateMessageEdit,
   validateMessageDelete,
+  validateMessageSearch,
 } = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
 
@@ -53,6 +54,29 @@ router.get(
  * Response: { totalUnread, byConversation }
  */
 router.get('/unread', requireAuth, getMessagesLimiter, messageController.getUnreadCounts);
+
+/**
+ * GET /api/messages/search
+ *
+ * Search messages using PostgreSQL full-text search
+ * Supports both global search and conversation-scoped search
+ *
+ * Query Parameters:
+ *   - q (string, required): Search query (1-100 chars)
+ *   - conversationId (string, optional): Scope search to specific conversation
+ *   - limit (number, optional): Results per page (1-100, default 50)
+ *   - cursor (string, optional): Cursor for pagination (format: timestamp:uuid)
+ *   - includeDeleted (boolean, optional): Include soft-deleted messages
+ *
+ * Response: { messages, nextCursor, hasMore, query, conversationId }
+ */
+router.get(
+  '/search',
+  requireAuth,
+  validateMessageSearch,
+  getMessagesLimiter,
+  messageController.searchMessages
+);
 
 // Rate limiter for edit/delete: 60 requests/minute (same as GET endpoints)
 const messageEditLimiter = rateLimit({
