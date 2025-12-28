@@ -324,10 +324,14 @@ describe('Message Controller - Message Retrieval', () => {
     });
 
     describe('Performance Tests', () => {
-      test('should handle large conversation (100 messages) efficiently', async () => {
-        // Create 100 messages sequentially to avoid connection pool exhaustion
-        // Note: Reduced from 1000 to 100 to prevent timeouts in CI environments
-        for (let i = 0; i < 100; i++) {
+      test('should handle large conversation efficiently', async () => {
+        // Use different message counts based on environment:
+        // - CI: 100 messages (faster, prevents timeout)
+        // - Local: 1000 messages (realistic performance test)
+        const MESSAGE_COUNT = process.env.CI ? 100 : 1000;
+
+        // Create messages sequentially to avoid connection pool exhaustion
+        for (let i = 0; i < MESSAGE_COUNT; i++) {
           await Message.create(testConversation.id, testUser1.id, `Message ${i + 1}`);
         }
 
@@ -343,7 +347,12 @@ describe('Message Controller - Message Retrieval', () => {
         expect(response.body.data.messages).toHaveLength(50);
         // Relaxed timing constraint for CI environments
         expect(duration).toBeLessThan(1000);
-      }, 30000); // 30 second timeout for this test
+
+        // Log performance metrics for analysis
+        if (process.env.NODE_ENV !== 'test') {
+          console.log(`Performance: ${MESSAGE_COUNT} messages, query took ${duration}ms`);
+        }
+      }, process.env.CI ? 30000 : 60000); // Conditional timeout
 
       test('should use cache for repeated requests', async () => {
         // Create some messages
