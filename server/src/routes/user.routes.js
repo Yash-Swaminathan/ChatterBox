@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const userController = require('../controllers/userController');
 const { requireAuth } = require('../middleware/auth');
-const { validateProfileUpdate, validateStatusUpdate } = require('../middleware/validation');
+const { validateProfileUpdate, validateStatusUpdate, validateUserSearch } = require('../middleware/validation');
 const { uploadAvatar, handleUploadError, validateFileExists } = require('../middleware/upload');
 
 // Rate limiters for user endpoints (disabled in test environment)
@@ -121,9 +121,9 @@ router.put(
  * @route   GET /api/users/search
  * @desc    Search users by username or email
  * @access  Protected
- * @query   q (search query), limit (optional), offset (optional)
+ * @query   q (search query), limit (optional), offset (optional), excludeContacts (optional boolean)
  */
-router.get('/search', requireAuth, profileViewLimiter, userController.searchUsers);
+router.get('/search', requireAuth, profileViewLimiter, validateUserSearch, userController.searchUsers);
 
 /**
  * @route   GET /api/users/:userId
