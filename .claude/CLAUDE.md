@@ -6,7 +6,7 @@
 
 ## 📋 Table of Contents
 
-1. [Current Progress & Next Steps](#current-progress--next-steps) ⭐ NEW
+1. [Current Progress & Next Steps](#current-progress--next-steps)
 2. [Project Overview](#project-overview)
 3. [Technology Stack](#technology-stack)
 4. [System Architecture](#system-architecture)
@@ -21,31 +21,199 @@
 
 ---
 
-## 🎯 CURRENT FOCUS: WEEK 10 DEPLOYMENT TARGET
+## 🎯 CURRENT FOCUS: WEEK 6 - Contact System Foundation
 
-### **Current Status**
-- **Phase**: PHASE 3 - Enhanced Messaging & Deployment Acceleration (Weeks 5-10)
-- **Current Task**: Week 6: Contact System Foundation - Day 1 ✅ COMPLETED
-- **Week 1 Completion**: 100% ✅
-- **Week 2 Completion**: 100% ✅
-- **Week 3 Completion**: 100% ✅ (All days complete + code review improvements)
-- **Week 4 Completion**: 100% ✅ (All days complete)
-  - Day 1-2: Conversation Setup ✅
-  - Day 3-5: Message Sending ✅
-  - Day 6-7: Message Retrieval with delivery tracking ✅
-- **Week 5 Completion**: 100% ✅ (All days complete)
-  - Day 1-2: Message Editing & Deletion ✅
-  - Day 3: Read Receipts Enhancement ✅
-  - Day 4-5: Message Search & Optimization ✅
-- **Week 6 Completion**: 33% (Day 1 complete, Days 2-3 pending)
-  - Day 1: Contact CRUD ✅
-- **Overall Completion**: Weeks 1-5 Complete ✅, Week 6 in progress
-- **Test Status**: 518 tests total (514 passing, 4 skipped) - 99.2% pass rate ✅
+**Status**: Week 6 - 67% Complete (Days 1-2 ✅, Day 3 pending) | 569 tests (565 passing, 4 skipped) - 99.3% pass rate
+
+---
+
+### 🚀 WEEK 6: Contact System Foundation (7 hours → 3 hours aggressive)
+
+**Day 1: Contact CRUD (1.5 hours)** - ✅ COMPLETED
+- [x] Created contacts table with migration 011_create_contacts.sql
+- [x] POST /api/contacts - Add contact by userId (idempotent)
+- [x] DELETE /api/contacts/:contactId - Remove contact
+- [x] GET /api/contacts - List user's contacts with pagination
+- [x] GET /api/contacts/exists/:userId - Check if contact exists
+- [x] PUT /api/contacts/:contactId - Update nickname and favorite status
+- [x] Tests: 73 tests passing (41 model + 32 controller)
+- [x] Edge cases: duplicate prevention, self-contact, non-existent user, pagination limits
+
+**Day 2: Contact Blocking (1 hour)** - ✅ COMPLETED
+- [x] POST /api/contacts/:contactId/block - Block contact (rate limited: 20 req/15min)
+- [x] POST /api/contacts/:contactId/unblock - Unblock contact (rate limited: 20 req/15min)
+- [x] Enhanced Contact model with blocking methods (blockContact, unblockContact, isBlocked, isSenderBlockedInConversation)
+- [x] Prevent messaging from blocked users (integrated into messageHandler.js)
+- [x] Filter blocked users from search results (bidirectional filtering in User.searchUsers)
+- [x] Tests: 51 tests passing (24 model + 27 controller) - block/unblock workflow, message prevention, search filtering
+- [x] Graceful error handling: Fail-safe design allows messages on DB errors (prioritizes delivery)
+
+**Day 3: Contact Discovery (0.5 hours)** - ⏳ NEXT
+- [ ] Enhance GET /api/users/search to exclude existing contacts
+- [ ] Add filter: ?excludeContacts=true
+- [ ] Optimize with NOT EXISTS subquery
+- [ ] Tests: search excludes contacts correctly
+
+**Key Simplification**: Skip contact requests/friend requests system (deferred to Week 18)
+
+**Deliverables:**
+- Full contact management (add/remove/block)
+- Blocked user enforcement
+- Optimized contact discovery
+
+**✅ Milestone 6**: Complete contact management system
+
+---
+
+### 🚀 WEEK 7-8: Group Messaging System (14 hours → 8 hours aggressive)
+
+**Week 7: Group Foundations (4 hours)**
+
+**Day 1-2: Group Conversation Creation (2 hours)**
+- [ ] POST /api/conversations/group endpoint (min 3 participants)
+- [ ] Creator gets role='admin', others get role='member'
+- [ ] GET /api/conversations?type=group - Filter user's groups
+- [ ] Tests: group creation, min participants, creator is admin
+
+**Day 3-4: Group Messaging (2 hours)**
+- [ ] Extend message:send handler for group conversations
+- [ ] Delivery status for groups (1 status row per recipient)
+- [ ] GET /api/conversations/:id/participants - List group members
+- [ ] Tests: group message broadcast, multi-user delivery
+
+**Week 8: Group Management & Polish (4 hours)**
+
+**Day 1-2: Add/Remove Participants (2 hours)**
+- [ ] POST /api/conversations/:id/participants (admin-only)
+- [ ] DELETE /api/conversations/:id/participants/:userId (admin-only or self-removal)
+- [ ] Tests: admin permissions, self-removal, left_at tracking
+
+**Day 3: Group Settings (1 hour)**
+- [ ] PUT /api/conversations/:id - Update group name/avatar (admin-only)
+- [ ] PUT /api/conversations/:id/participants/:userId/role (promote/demote)
+- [ ] Tests: role changes, admin-only
+
+**Day 4-5: Group Polish & Testing (1 hour)**
+- [ ] Message mentions (@username) - simple version
+- [ ] Group leave functionality (self-removal)
+- [ ] Last admin protection (can't remove last admin)
+- [ ] Integration tests: full group lifecycle
+
+**✅ Milestone 7**: Feature-complete group messaging system
+
+---
+
+### 🚀 WEEK 9: Minimal Viable Frontend - Part 1 (7 hours → 5 hours aggressive)
+
+**Day 1-2: React Setup & Authentication (2.5 hours)**
+- [ ] Create React app with Vite
+- [ ] Login/Register pages with AuthContext
+- [ ] Axios interceptor for JWT tokens
+- [ ] Protected route wrapper
+
+**Day 3-4: Chat Interface Foundation (2.5 hours)**
+- [ ] Main layout: Sidebar + Chat window
+- [ ] Sidebar: Conversation list
+- [ ] Socket.io connection + message:send event
+- [ ] Display received messages in real-time
+- [ ] Basic styling (plain CSS, no Material-UI)
+
+**✅ Milestone 8**: Basic UI functional
+
+---
+
+### 🚀 WEEK 10: Frontend Completion & Deployment (7 hours → 5 hours aggressive)
+
+**Day 1-2: Group Chats UI (2 hours)**
+- [ ] "Create Group" button + modal
+- [ ] Group settings modal (add/remove members, change name)
+- [ ] Admin-only UI elements
+
+**Day 3: Polish & Bug Fixes (1.5 hours)**
+- [ ] Message timestamps + online/offline indicators
+- [ ] Scroll to bottom on new message
+- [ ] Loading states + error messages
+- [ ] Mobile responsive (basic)
+
+**Day 4-5: Deployment (1.5 hours)**
+- [ ] Docker setup (Dockerfile for server + client, docker-compose.yml)
+- [ ] Environment variables (.env.production)
+- [ ] Nginx configuration (serve React, proxy /api and /socket.io)
+- [ ] Deploy to Railway.app ($5/month)
+  - PostgreSQL + Redis managed instances
+  - SSL certificate (Let's Encrypt)
+
+**✅ Milestone 9**: **PRODUCTION DEPLOYMENT COMPLETE! 🚀**
+
+---
+
+## 📊 OVERALL PROGRESS SUMMARY
+
+### **Completed Weeks**
+- **Week 1**: Project Setup & Authentication ✅ (100%)
+- **Week 2**: User Management ✅ (100%)
+- **Week 3**: Socket.io Setup & Presence ✅ (100%)
+- **Week 4**: Basic Messaging ✅ (100%)
+- **Week 5**: Enhanced Messaging ✅ (100%)
+- **Week 6**: Contact System Foundation ⏳ (67% - Day 3 pending)
+
+### **Upcoming Weeks (Target: Week 10 Deployment)**
+- **Week 7-8**: Group Messaging System (pending)
+- **Week 9**: Minimal Viable Frontend (pending)
+- **Week 10**: Deployment & Polish (pending)
+
+### **Stats**
+- **Total Tests**: 569 (565 passing, 4 skipped) - 99.3% pass rate ✅
 - **Code Quality**: 0 ESLint errors, 8 warnings ✅
-- **🎯 Week 10 Goal**: Production deployment with group messaging, contacts, and minimal frontend
-- **📊 Post-Launch**: Weeks 11-18 for file attachments, advanced features, and friend request system
+- **Database Migrations**: 11 applied ✅
+- **API Endpoints**: 25+ routes with rate limiting ✅
 
-**Latest Implementation - Week 6 Day 1: Contact CRUD (COMPLETED 2025-12-27)**
+---
+
+## 📝 DETAILED IMPLEMENTATION HISTORY
+
+<details>
+<summary><b>📋 Click to view detailed implementation history (Week 5-6)</b></summary>
+
+### **Week 6 Day 2: Contact Blocking (COMPLETED 2025-12-28)**
+- ✅ Enhanced Contact.js model with blocking methods
+  - blockContact (sets is_blocked to true)
+  - unblockContact (sets is_blocked to false)
+  - isBlocked (checks blocking status in both directions)
+  - isSenderBlockedInConversation (optimized for message handlers)
+  - Bidirectional blocking check (A→B or B→A)
+  - Graceful degradation on database errors (fail-safe: allow messages)
+- ✅ contactController.js with block/unblock handlers
+  - blockContact (POST /api/contacts/:contactId/block)
+  - unblockContact (POST /api/contacts/:contactId/unblock)
+  - Ownership validation (only owner can block/unblock)
+  - 404 handling for non-existent contacts
+- ✅ Enhanced user search to filter blocked users
+  - Added excludeBlockedUsers parameter to User.searchUsers()
+  - Filters out users blocked by current user
+  - Filters out users who blocked current user (bidirectional privacy)
+  - Optimized with LEFT JOIN and WHERE clause
+- ✅ Block enforcement in messageHandler.js
+  - Integrated Contact.isSenderBlockedInConversation() check
+  - Prevents sending messages if blocked (either direction)
+  - Returns BLOCKED error with clear message
+  - Graceful error handling (allows message on DB errors)
+- ✅ Routes with rate limiting
+  - POST /api/contacts/:contactId/block (20 req/15min)
+  - POST /api/contacts/:contactId/unblock (20 req/15min)
+- ✅ 51 new tests passing (24 model + 27 controller)
+  - Block/unblock workflow tests
+  - Bidirectional blocking enforcement
+  - User search filtering (blocks both directions)
+  - Message prevention via Socket.io
+  - Error handling and edge cases
+- ✅ Performance optimization: Environment-aware password hashing
+  - Production: 12 salt rounds (secure)
+  - Test: 4 salt rounds (faster test execution)
+  - Reduces test suite time from 60s to 25s
+- ✅ Total tests: 569 (565 passing, 4 skipped) - 99.3% pass rate
+
+**Previous Implementation - Week 6 Day 1: Contact CRUD (COMPLETED 2025-12-27)**
 - ✅ Database migration: 011_create_contacts.sql with proper schema
   - UUID primary key with gen_random_uuid()
   - Foreign keys to users table with CASCADE delete
@@ -113,7 +281,7 @@
 - ✅ Shared rate limiter utility (30 edits/deletes per minute, shared with Socket.io)
 - ✅ Comprehensive validation middleware for UUID and content
 
-**Code Review Fixes Applied (2024-12-24)**:
+**Code Review Fixes Applied (2025-12-24)**:
 - ✅ CHECK constraint on message_status.status already in place
 - ✅ TTL on Redis sorted sets already configured
 - ✅ Try-catch blocks in all Socket.io handlers already present
@@ -124,6 +292,8 @@
   - Read receipt broadcast optimization
   - Distributed locking for cache population
   - Prometheus metrics for monitoring
+
+</details>
 
 ---
 
@@ -151,12 +321,14 @@
 - [x] Tests: 73 tests passing (41 model + 32 controller)
 - [x] Edge cases: duplicate prevention, self-contact, non-existent user, pagination limits
 
-**Day 2: Contact Blocking (1 hour)**
-- [ ] PUT /api/contacts/:contactId/block - Block contact
-- [ ] PUT /api/contacts/:contactId/unblock - Unblock
-- [ ] Prevent messaging from blocked users (middleware)
-- [ ] Filter blocked users from search results
-- [ ] Tests: block prevents messaging, search filtering
+**Day 2: Contact Blocking (1 hour)** - ✅ COMPLETED
+- [x] POST /api/contacts/:contactId/block - Block contact (rate limited: 20 req/15min)
+- [x] POST /api/contacts/:contactId/unblock - Unblock contact (rate limited: 20 req/15min)
+- [x] Enhanced Contact model with blocking methods (blockContact, unblockContact, isBlocked, isSenderBlockedInConversation)
+- [x] Prevent messaging from blocked users (integrated into messageHandler.js)
+- [x] Filter blocked users from search results (bidirectional filtering in User.searchUsers)
+- [x] Tests: 51 tests passing (24 model + 27 controller) - block/unblock workflow, message prevention, search filtering
+- [x] Graceful error handling: Fail-safe design allows messages on DB errors (prioritizes delivery)
 
 **Day 3: Contact Discovery (0.5 hours)**
 - [ ] Enhance GET /api/users/search to exclude existing contacts
@@ -1666,23 +1838,23 @@ socket.on('message:read-confirmed', { updatedCount });
 ### High-Level Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       CLIENT LAYER                           │
+┌────────────────────────────────────────────────────────────┐
+│                       CLIENT LAYER                         │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │      React SPA (Single Page Application)            │  │
+│  │      React SPA (Single Page Application)             │  │
 │  │  • Socket.io Client                                  │  │
 │  │  • Redux for State Management                        │  │
 │  │  • Material-UI Components                            │  │
 │  │  • Axios for REST API calls                          │  │
 │  └──────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────────┘
                          ↕ (WebSocket + HTTPS)
 ┌─────────────────────────────────────────────────────────────┐
-│                  LOAD BALANCER (Nginx)                       │
+│                  LOAD BALANCER (Nginx)                      │
 │         • SSL Termination (TLS 1.3)                         │
-│         • WebSocket Proxy                                    │
-│         • Static Asset Serving                               │
-│         • Gzip Compression                                   │
+│         • WebSocket Proxy                                   │
+│         • Static Asset Serving                              │
+│         • Gzip Compression                                  │
 └─────────────────────────────────────────────────────────────┘
                          ↕
 ┌─────────────────────────────────────────────────────────────┐
