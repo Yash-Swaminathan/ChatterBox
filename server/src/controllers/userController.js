@@ -159,48 +159,30 @@ async function updateCurrentUser(req, res) {
 
 /**
  * Search users by username or email
- * @route GET /api/users/search?q={query}&limit={n}&offset={n}
+ * @route GET /api/users/search?q={query}&limit={n}&offset={n}&excludeContacts={boolean}
  * @access Protected
  */
 async function searchUsers(req, res) {
   try {
-    const { q: query } = req.query;
+    const { q: query, excludeContacts } = req.query;
 
-    // Validate query parameter
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'MISSING_QUERY',
-          message: 'Search query (q) is required',
-        },
-      });
-    }
-
-    // Validate query length
-    if (query.trim().length < 2) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'QUERY_TOO_SHORT',
-          message: 'Query must be at least 2 characters',
-        },
-      });
-    }
-
+    // Validation is handled by middleware
     // Get pagination parameters
     const { limit, offset } = getPaginationParams(req);
 
+    // Parse excludeContacts parameter (default: false)
+    const shouldExcludeContacts = excludeContacts === 'true';
+
     // TODO: CACHING OPTIMIZATION (Future)
     // Consider caching search results in Redis for common queries:
-    // const cacheKey = `search:${query}:${limit}:${offset}`;
+    // const cacheKey = `search:${query}:${limit}:${offset}:${shouldExcludeContacts}`;
     // TTL: 30-60 seconds (balance freshness vs performance)
     // This reduces DB load for repeated searches
     // Priority: Medium (implement when search load increases)
 
-    // Search users (with blocking filter)
+    // Search users (with blocking filter and optional contact exclusion)
     const currentUserId = req.user?.userId;
-    const { users, total } = await User.searchUsers(query, limit, offset, currentUserId);
+    const { users, total } = await User.searchUsers(query, limit, offset, currentUserId, shouldExcludeContacts);
 
     // TODO: SEARCH ANALYTICS (Future Enhancement)
     // Track search queries for UX improvements and analytics:
