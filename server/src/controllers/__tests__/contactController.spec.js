@@ -590,4 +590,202 @@ describe('Contact Controller Integration Tests', () => {
       expect(response.body.message).toContain('valid UUID');
     });
   });
+
+  describe('PUT /api/contacts/:contactId/block - Block Contact', () => {
+    it('should block contact successfully', async () => {
+      Contact.findById = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: false,
+      });
+
+      Contact.toggleBlock = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: true,
+      });
+
+      Contact.getContactDetails = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: true,
+        user: { id: contactUserId, username: 'alice' },
+      });
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/block`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toContain('blocked successfully');
+      expect(response.body.data.contact.isBlocked).toBe(true);
+      expect(Contact.toggleBlock).toHaveBeenCalledWith(contactId, true);
+    });
+
+    it('should return 200 if contact already blocked (idempotent)', async () => {
+      Contact.findById = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: true, // Already blocked
+      });
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/block`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toContain('already blocked');
+      expect(Contact.toggleBlock).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 if contact not found', async () => {
+      Contact.findById = jest.fn().mockResolvedValue(null);
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/block`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404);
+
+      expect(response.body.error).toBe('Not Found');
+    });
+
+    it('should return 403 if user does not own contact', async () => {
+      Contact.findById = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId: 'other-user-id',
+        contactUserId,
+      });
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/block`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403);
+
+      expect(response.body.error).toBe('Forbidden');
+      expect(response.body.message).toBe('Forbidden: You do not own this contact');
+    });
+
+    it('should validate contactId format (UUID)', async () => {
+      const response = await request(app)
+        .put('/api/contacts/invalid-uuid/block')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+      expect(response.body.message).toContain('valid UUID');
+    });
+
+    it('should handle database errors gracefully', async () => {
+      Contact.findById = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: false,
+      });
+
+      Contact.toggleBlock = jest.fn().mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/block`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(500);
+
+      expect(response.body.error).toBe('Internal Server Error');
+    });
+  });
+
+  describe('PUT /api/contacts/:contactId/unblock - Unblock Contact', () => {
+    it('should unblock contact successfully', async () => {
+      Contact.findById = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: true,
+      });
+
+      Contact.toggleBlock = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: false,
+      });
+
+      Contact.getContactDetails = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: false,
+        user: { id: contactUserId, username: 'alice' },
+      });
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/unblock`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toContain('unblocked successfully');
+      expect(response.body.data.contact.isBlocked).toBe(false);
+      expect(Contact.toggleBlock).toHaveBeenCalledWith(contactId, false);
+    });
+
+    it('should return 200 if contact not blocked (idempotent)', async () => {
+      Contact.findById = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId,
+        contactUserId,
+        isBlocked: false, // Not blocked
+      });
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/unblock`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toContain('not blocked');
+      expect(Contact.toggleBlock).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 if contact not found', async () => {
+      Contact.findById = jest.fn().mockResolvedValue(null);
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/unblock`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404);
+
+      expect(response.body.error).toBe('Not Found');
+    });
+
+    it('should return 403 if user does not own contact', async () => {
+      Contact.findById = jest.fn().mockResolvedValue({
+        id: contactId,
+        userId: 'other-user-id',
+        contactUserId,
+      });
+
+      const response = await request(app)
+        .put(`/api/contacts/${contactId}/unblock`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403);
+
+      expect(response.body.error).toBe('Forbidden');
+    });
+
+    it('should validate contactId format (UUID)', async () => {
+      const response = await request(app)
+        .put('/api/contacts/invalid-uuid/unblock')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+    });
+  });
 });

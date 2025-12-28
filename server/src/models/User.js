@@ -296,12 +296,14 @@ async function getUserByUsername(username) {
 
 /**
  * Search users by username or email with pagination
+ * Filters out blocked users (bidirectional: users you blocked AND users who blocked you)
  * @param {string} query - Search query (username or email)
  * @param {number} limit - Maximum number of results
  * @param {number} offset - Number of results to skip
+ * @param {string|null} currentUserId - Current user's ID for blocking filter (optional)
  * @returns {Promise<Object>} Object with users array and total count
  */
-async function searchUsers(query, limit = 20, offset = 0) {
+async function searchUsers(query, limit = 20, offset = 0, currentUserId = null) {
   try {
     // Validate query
     if (!query || typeof query !== 'string' || query.trim().length < 2) {
@@ -326,16 +328,20 @@ async function searchUsers(query, limit = 20, offset = 0) {
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM users
+      FROM users u
+      LEFT JOIN contacts c1 ON (c1.user_id = $2 AND c1.contact_user_id = u.id AND c1.is_blocked = TRUE)
+      LEFT JOIN contacts c2 ON (c2.user_id = u.id AND c2.contact_user_id = $2 AND c2.is_blocked = TRUE)
       WHERE
         is_active = TRUE
         AND (
           username ILIKE $1
           OR email ILIKE $1
         )
+        AND c1.id IS NULL
+        AND c2.id IS NULL
     `;
 
-    const countResult = await pool.query(countQuery, [searchPattern]);
+    const countResult = await pool.query(countQuery, [searchPattern, currentUserId]);
     const total = parseInt(countResult.rows[0].total, 10);
 
     // TODO: SEARCH RELEVANCE (Future Enhancement)
@@ -358,25 +364,29 @@ async function searchUsers(query, limit = 20, offset = 0) {
     // Get paginated results
     const searchQuery = `
       SELECT
-        id,
-        username,
-        display_name,
-        bio,
-        avatar_url,
-        status,
-        created_at
-      FROM users
+        u.id,
+        u.username,
+        u.display_name,
+        u.bio,
+        u.avatar_url,
+        u.status,
+        u.created_at
+      FROM users u
+      LEFT JOIN contacts c1 ON (c1.user_id = $4 AND c1.contact_user_id = u.id AND c1.is_blocked = TRUE)
+      LEFT JOIN contacts c2 ON (c2.user_id = u.id AND c2.contact_user_id = $4 AND c2.is_blocked = TRUE)
       WHERE
-        is_active = TRUE
+        u.is_active = TRUE
         AND (
-          username ILIKE $1
-          OR email ILIKE $1
+          u.username ILIKE $1
+          OR u.email ILIKE $1
         )
-      ORDER BY username
+        AND c1.id IS NULL
+        AND c2.id IS NULL
+      ORDER BY u.username
       LIMIT $2 OFFSET $3
     `;
 
-    const result = await pool.query(searchQuery, [searchPattern, limit, offset]);
+    const result = await pool.query(searchQuery, [searchPattern, limit, offset, currentUserId]);
 
     logger.info('User search completed', {
       query,

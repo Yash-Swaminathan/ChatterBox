@@ -85,7 +85,7 @@ describe('Message Search API', () => {
       );
       testMessages.push({ id: msgResult.rows[0].id, content: messageTexts[i] });
     }
-  });
+  }, 30000); // 30 second timeout for bcrypt + DB setup
 
   afterAll(async () => {
     // Delete in reverse dependency order to respect foreign key constraints:

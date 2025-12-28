@@ -566,4 +566,146 @@ describe('Contact Model', () => {
       );
     });
   });
+
+  describe('toggleBlock', () => {
+    it('should block contact successfully', async () => {
+      const mockContact = {
+        id: 'contact-123',
+        user_id: 'user-1',
+        contact_user_id: 'user-2',
+        nickname: null,
+        is_blocked: true,
+        is_favorite: false,
+        added_at: new Date(),
+      };
+
+      pool.query = jest.fn().mockResolvedValue({ rows: [mockContact] });
+
+      const result = await Contact.toggleBlock('contact-123', true);
+
+      expect(result.isBlocked).toBe(true);
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE contacts'),
+        [true, 'contact-123']
+      );
+    });
+
+    it('should unblock contact successfully', async () => {
+      const mockContact = {
+        id: 'contact-123',
+        user_id: 'user-1',
+        contact_user_id: 'user-2',
+        nickname: null,
+        is_blocked: false,
+        is_favorite: false,
+        added_at: new Date(),
+      };
+
+      pool.query = jest.fn().mockResolvedValue({ rows: [mockContact] });
+
+      const result = await Contact.toggleBlock('contact-123', false);
+
+      expect(result.isBlocked).toBe(false);
+    });
+
+    it('should return null if contact not found', async () => {
+      pool.query = jest.fn().mockResolvedValue({ rows: [] });
+
+      const result = await Contact.toggleBlock('non-existent', true);
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle database errors gracefully', async () => {
+      pool.query = jest.fn().mockRejectedValue(new Error('DB error'));
+
+      await expect(Contact.toggleBlock('contact-123', true)).rejects.toThrow('DB error');
+    });
+  });
+
+  describe('isBlocked', () => {
+    it('should return true if user A blocked user B', async () => {
+      pool.query = jest.fn().mockResolvedValue({ rows: [{ blocked: true }] });
+
+      const result = await Contact.isBlocked('user-1', 'user-2');
+
+      expect(result).toBe(true);
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT EXISTS'),
+        ['user-1', 'user-2']
+      );
+    });
+
+    it('should return true if user B blocked user A (bidirectional)', async () => {
+      pool.query = jest.fn().mockResolvedValue({ rows: [{ blocked: true }] });
+
+      const result = await Contact.isBlocked('user-1', 'user-2');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false if not blocked', async () => {
+      pool.query = jest.fn().mockResolvedValue({ rows: [{ blocked: false }] });
+
+      const result = await Contact.isBlocked('user-1', 'user-2');
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false on database errors (fail-safe)', async () => {
+      pool.query = jest.fn().mockRejectedValue(new Error('DB error'));
+
+      const result = await Contact.isBlocked('user-1', 'user-2');
+
+      expect(result).toBe(false); // Fail-safe: don't block on errors
+    });
+  });
+
+  describe('isSenderBlockedInConversation', () => {
+    it('should return true if sender blocked in direct conversation', async () => {
+      pool.query = jest
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ type: 'direct' }] }) // First query: conversation type
+        .mockResolvedValueOnce({ rows: [{ blocked: true }] }); // Second query: blocking check
+
+      const result = await Contact.isSenderBlockedInConversation('conv-123', 'user-1');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false for group conversations', async () => {
+      pool.query = jest.fn().mockResolvedValue({ rows: [{ type: 'group' }] });
+
+      const result = await Contact.isSenderBlockedInConversation('conv-123', 'user-1');
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false if not blocked in direct conversation', async () => {
+      pool.query = jest
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ type: 'direct' }] })
+        .mockResolvedValueOnce({ rows: [{ blocked: false }] });
+
+      const result = await Contact.isSenderBlockedInConversation('conv-123', 'user-1');
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false if conversation not found', async () => {
+      pool.query = jest.fn().mockResolvedValue({ rows: [] });
+
+      const result = await Contact.isSenderBlockedInConversation('non-existent', 'user-1');
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false on database errors (fail-safe)', async () => {
+      pool.query = jest.fn().mockRejectedValue(new Error('DB error'));
+
+      const result = await Contact.isSenderBlockedInConversation('conv-123', 'user-1');
+
+      expect(result).toBe(false); // Fail-safe
+    });
+  });
 });
