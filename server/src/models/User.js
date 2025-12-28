@@ -297,13 +297,15 @@ async function getUserByUsername(username) {
 /**
  * Search users by username or email with pagination
  * Filters out blocked users (bidirectional: users you blocked AND users who blocked you)
+ * Optionally filters out existing contacts for contact discovery
  * @param {string} query - Search query (username or email)
  * @param {number} limit - Maximum number of results
  * @param {number} offset - Number of results to skip
  * @param {string|null} currentUserId - Current user's ID for blocking filter (optional)
+ * @param {boolean} excludeContacts - Whether to exclude existing contacts from results (default: false)
  * @returns {Promise<Object>} Object with users array and total count
  */
-async function searchUsers(query, limit = 20, offset = 0, currentUserId = null) {
+async function searchUsers(query, limit = 20, offset = 0, currentUserId = null, excludeContacts = false) {
   try {
     // Validate query
     if (!query || typeof query !== 'string' || query.trim().length < 2) {
@@ -325,6 +327,15 @@ async function searchUsers(query, limit = 20, offset = 0, currentUserId = null) 
     // This would eliminate the separate count query and improve performance
     // Priority: Medium (optimize when user base grows beyond 10k users)
 
+    // Build dynamic WHERE clause based on filters
+    // Using NOT EXISTS for better performance on large datasets
+    const contactExclusionClause = excludeContacts && currentUserId
+      ? `AND NOT EXISTS (
+           SELECT 1 FROM contacts
+           WHERE user_id = $2 AND contact_user_id = u.id
+         )`
+      : '';
+
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as total
@@ -339,6 +350,7 @@ async function searchUsers(query, limit = 20, offset = 0, currentUserId = null) 
         )
         AND c1.id IS NULL
         AND c2.id IS NULL
+        ${contactExclusionClause}
     `;
 
     const countResult = await pool.query(countQuery, [searchPattern, currentUserId]);
@@ -382,6 +394,7 @@ async function searchUsers(query, limit = 20, offset = 0, currentUserId = null) 
         )
         AND c1.id IS NULL
         AND c2.id IS NULL
+        ${contactExclusionClause}
       ORDER BY u.username
       LIMIT $2 OFFSET $3
     `;
@@ -392,6 +405,7 @@ async function searchUsers(query, limit = 20, offset = 0, currentUserId = null) 
       query,
       resultsFound: result.rows.length,
       total,
+      excludeContacts,
     });
 
     return {

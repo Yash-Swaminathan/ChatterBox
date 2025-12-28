@@ -561,6 +561,38 @@ function validateGetContacts(req, res, next) {
 }
 
 /**
+ * Validate user search query parameters
+ */
+function validateUserSearch(req, res, next) {
+  const { q, excludeContacts } = req.query;
+  const errors = [];
+
+  // Validate query (required, min 2 chars)
+  if (!q || typeof q !== 'string') {
+    errors.push('Search query (q) is required');
+  } else if (q.trim().length < 2) {
+    errors.push('Query must be at least 2 characters');
+  }
+
+  // Validate excludeContacts (optional boolean string)
+  if (excludeContacts !== undefined && !isOneOf(excludeContacts, ['true', 'false'])) {
+    errors.push('excludeContacts must be true or false');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: errors[0],
+      },
+    });
+  }
+
+  next();
+}
+
+/**
  * Generic UUID validator middleware factory
  * Returns middleware that validates a parameter is a valid UUID
  */
@@ -600,5 +632,6 @@ module.exports = {
   validateAddContact,
   validateUpdateContact,
   validateGetContacts,
+  validateUserSearch,
   validateUUID,
 };
