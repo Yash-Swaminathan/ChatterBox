@@ -106,16 +106,6 @@ describe('Message Search API', () => {
     await new Promise(resolve => setTimeout(resolve, 100));
   });
 
-  beforeEach(async () => {
-    // Wait for any pending async operations to complete
-    await new Promise(resolve => setImmediate(resolve));
-  });
-
-  afterEach(async () => {
-    // Flush any pending async operations
-    await new Promise(resolve => setImmediate(resolve));
-  });
-
   describe('1. Basic Search', () => {
     test('should return messages from global search', async () => {
       const response = await request(app)
