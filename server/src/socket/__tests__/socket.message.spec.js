@@ -41,6 +41,10 @@ jest.mock('../../models/Conversation', () => ({
   getParticipants: jest.fn(),
 }));
 
+jest.mock('../../models/Contact', () => ({
+  isSenderBlockedInConversation: jest.fn(),
+}));
+
 jest.mock('../../models/MessageStatus', () => ({
   createInitialStatus: jest.fn().mockResolvedValue(undefined),
   batchUpdateStatus: jest.fn().mockResolvedValue(1),
@@ -91,6 +95,7 @@ jest.mock('../../config/redis', () => ({
 
 const Message = require('../../models/Message');
 const Conversation = require('../../models/Conversation');
+const Contact = require('../../models/Contact');
 
 describe('Socket.io Message Integration Tests', () => {
   let httpServer;
@@ -172,6 +177,9 @@ describe('Socket.io Message Integration Tests', () => {
     Conversation.getParticipants.mockResolvedValue([
       { user_id: testUserId, username: 'testuser1' },
     ]);
+
+    // Default: user is not blocked
+    Contact.isSenderBlockedInConversation.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -938,6 +946,57 @@ describe('Socket.io Message Integration Tests', () => {
       const sent = await sentPromise;
 
       expect(sent.messageId).toBe('msg-rtl');
+    });
+  });
+
+  describe('Blocking Prevention', () => {
+    it('should prevent message if sender is blocked', async () => {
+      // Mock: User is blocked in this conversation
+      Contact.isSenderBlockedInConversation.mockResolvedValue(true);
+
+      clientSocket = createClient(testToken);
+      await waitForConnection(clientSocket);
+
+      const errorPromise = waitForEvent(clientSocket, 'message:error');
+
+      clientSocket.emit('message:send', {
+        conversationId: testConversationId,
+        content: 'This should be blocked',
+        tempId: 'temp-blocked',
+      });
+
+      const error = await errorPromise;
+
+      expect(error.code).toBe('FORBIDDEN');
+      expect(error.message).toContain('blocked');
+      expect(error.tempId).toBe('temp-blocked');
+      expect(Message.create).not.toHaveBeenCalled();
+    });
+
+    it('should allow message if not blocked', async () => {
+      // Mock: User is not blocked (default behavior)
+      Contact.isSenderBlockedInConversation.mockResolvedValue(false);
+
+      clientSocket = createClient(testToken);
+      await waitForConnection(clientSocket);
+
+      const sentPromise = waitForEvent(clientSocket, 'message:sent');
+
+      clientSocket.emit('message:send', {
+        conversationId: testConversationId,
+        content: 'This should work',
+        tempId: 'temp-allowed',
+      });
+
+      const sent = await sentPromise;
+
+      expect(sent.messageId).toBe('msg-123');
+      expect(sent.tempId).toBe('temp-allowed');
+      expect(Contact.isSenderBlockedInConversation).toHaveBeenCalledWith(
+        testConversationId,
+        testUserId
+      );
+      expect(Message.create).toHaveBeenCalled();
     });
   });
 });

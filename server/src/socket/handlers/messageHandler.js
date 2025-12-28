@@ -1,6 +1,7 @@
 const Message = require('../../models/Message');
 const Conversation = require('../../models/Conversation');
 const MessageStatus = require('../../models/MessageStatus');
+const Contact = require('../../models/Contact');
 const User = require('../../models/User');
 const MessageCacheService = require('../../services/messageCacheService');
 const logger = require('../../utils/logger');
@@ -102,6 +103,7 @@ const ERROR_CODES = {
   MESSAGE_NOT_FOUND: 'MESSAGE_NOT_FOUND',
   NOT_OWNER: 'NOT_OWNER',
   RATE_LIMITED: 'RATE_LIMITED',
+  FORBIDDEN: 'FORBIDDEN',
   DATABASE_ERROR: 'DATABASE_ERROR',
 };
 
@@ -267,6 +269,25 @@ async function handleMessageSend(io, socket, data) {
         code: ERROR_CODES.NOT_PARTICIPANT,
         message: 'You are not a participant in this conversation',
       });
+      return;
+    }
+
+    // Check if sender is blocked by any recipient (bidirectional blocking)
+    const isBlocked = await Contact.isSenderBlockedInConversation(conversationId, userId);
+
+    if (isBlocked) {
+      logger.warn('Message send blocked due to contact blocking', {
+        conversationId,
+        senderId: userId,
+        socketId: socket.id,
+      });
+
+      socket.emit('message:error', {
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Cannot send message: You are blocked by this contact',
+        tempId,
+      });
+
       return;
     }
 

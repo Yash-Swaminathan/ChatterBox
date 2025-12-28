@@ -198,8 +198,9 @@ async function searchUsers(req, res) {
     // This reduces DB load for repeated searches
     // Priority: Medium (implement when search load increases)
 
-    // Search users
-    const { users, total } = await User.searchUsers(query, limit, offset);
+    // Search users (with blocking filter)
+    const currentUserId = req.user?.userId;
+    const { users, total } = await User.searchUsers(query, limit, offset, currentUserId);
 
     // TODO: SEARCH ANALYTICS (Future Enhancement)
     // Track search queries for UX improvements and analytics:

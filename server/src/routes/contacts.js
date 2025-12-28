@@ -55,4 +55,24 @@ router.put(
 // DELETE /api/contacts/:contactId - Remove contact
 router.delete('/:contactId', validateUUID('contactId'), contactController.removeContact);
 
+/**
+ * Block a contact
+ * PUT /api/contacts/:contactId/block
+ */
+router.put(
+  '/:contactId/block',
+  validateUUID('contactId'),
+  contactController.blockContact
+);
+
+/**
+ * Unblock a contact
+ * PUT /api/contacts/:contactId/unblock
+ */
+router.put(
+  '/:contactId/unblock',
+  validateUUID('contactId'),
+  contactController.unblockContact
+);
+
 module.exports = router;

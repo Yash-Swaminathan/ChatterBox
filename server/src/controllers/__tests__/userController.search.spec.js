@@ -56,7 +56,7 @@ describe('User Controller - Search', () => {
       expect(response.body.pagination).toHaveProperty('limit', 20);
       expect(response.body.pagination).toHaveProperty('offset', 0);
       expect(response.body.pagination).toHaveProperty('hasMore', false);
-      expect(User.searchUsers).toHaveBeenCalledWith('john', 20, 0);
+      expect(User.searchUsers).toHaveBeenCalledWith('john', 20, 0, mockUser.id);
     });
 
     it('should search users by email successfully', async () => {
@@ -74,7 +74,7 @@ describe('User Controller - Search', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.users).toHaveLength(1);
-      expect(User.searchUsers).toHaveBeenCalledWith('test@example.com', 20, 0);
+      expect(User.searchUsers).toHaveBeenCalledWith('test@example.com', 20, 0, mockUser.id);
     });
 
     it('should handle pagination parameters correctly', async () => {
@@ -97,7 +97,7 @@ describe('User Controller - Search', () => {
       expect(response.body.pagination.offset).toBe(5);
       expect(response.body.pagination.total).toBe(25);
       expect(response.body.pagination.hasMore).toBe(true);
-      expect(User.searchUsers).toHaveBeenCalledWith('user', 10, 5);
+      expect(User.searchUsers).toHaveBeenCalledWith('user', 10, 5, mockUser.id);
     });
 
     it('should cap limit at maximum (50)', async () => {
@@ -109,7 +109,7 @@ describe('User Controller - Search', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
-      expect(User.searchUsers).toHaveBeenCalledWith('test', 50, 0);
+      expect(User.searchUsers).toHaveBeenCalledWith('test', 50, 0, mockUser.id);
     });
 
     it('should use default pagination if not provided', async () => {
@@ -121,7 +121,7 @@ describe('User Controller - Search', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
-      expect(User.searchUsers).toHaveBeenCalledWith('test', 20, 0);
+      expect(User.searchUsers).toHaveBeenCalledWith('test', 20, 0, mockUser.id);
     });
 
     it('should return empty results for no matches', async () => {
@@ -216,7 +216,7 @@ describe('User Controller - Search', () => {
 
       expect(response.status).toBe(200);
       // Should use defaults: limit=20, offset=0
-      expect(User.searchUsers).toHaveBeenCalledWith('test', 20, 0);
+      expect(User.searchUsers).toHaveBeenCalledWith('test', 20, 0, mockUser.id);
     });
   });
 });

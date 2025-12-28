@@ -366,10 +366,179 @@ async function updateContact(req, res) {
   }
 }
 
+/**
+ * Block a contact
+ * PUT /api/contacts/:contactId/block
+ */
+async function blockContact(req, res) {
+  try {
+    const { contactId } = req.params;
+    const currentUserId = req.user.userId;
+
+    // Verify contact exists and belongs to current user
+    const contact = await Contact.findById(contactId);
+
+    if (!contact) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Contact not found',
+      });
+    }
+
+    // Verify ownership
+    if (contact.userId !== currentUserId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Forbidden: You do not own this contact',
+      });
+    }
+
+    // Check if already blocked
+    if (contact.isBlocked) {
+      return res.status(200).json({
+        success: true,
+        message: 'Contact is already blocked',
+        data: { contact },
+      });
+    }
+
+    // Block the contact
+    const updatedContact = await Contact.toggleBlock(contactId, true);
+
+    if (!updatedContact) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Contact not found',
+      });
+    }
+
+    // Get full contact details with user info
+    const fullContact = await Contact.getContactDetails(updatedContact.id);
+
+    logger.info('Contact blocked', {
+      contactId,
+      userId: currentUserId,
+      contactUserId: contact.contactUserId,
+    });
+
+    // TODO (Week 18): Send notification to blocked user (optional)
+    // Consider privacy: should blocked user know they were blocked?
+
+    return res.json({
+      success: true,
+      message: 'Contact blocked successfully',
+      data: { contact: fullContact },
+    });
+  } catch (error) {
+    logger.error('Error in blockContact', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.userId,
+      contactId: req.params?.contactId,
+    });
+
+    const errorResponse = {
+      error: 'Internal Server Error',
+      message: 'Failed to block contact',
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = error.message;
+      errorResponse.code = error.code;
+    }
+
+    return res.status(500).json(errorResponse);
+  }
+}
+
+/**
+ * Unblock a contact
+ * PUT /api/contacts/:contactId/unblock
+ */
+async function unblockContact(req, res) {
+  try {
+    const { contactId } = req.params;
+    const currentUserId = req.user.userId;
+
+    // Verify contact exists and belongs to current user
+    const contact = await Contact.findById(contactId);
+
+    if (!contact) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Contact not found',
+      });
+    }
+
+    // Verify ownership
+    if (contact.userId !== currentUserId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Forbidden: You do not own this contact',
+      });
+    }
+
+    // Check if not blocked
+    if (!contact.isBlocked) {
+      return res.status(200).json({
+        success: true,
+        message: 'Contact is not blocked',
+        data: { contact },
+      });
+    }
+
+    // Unblock the contact
+    const updatedContact = await Contact.toggleBlock(contactId, false);
+
+    if (!updatedContact) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Contact not found',
+      });
+    }
+
+    // Get full contact details with user info
+    const fullContact = await Contact.getContactDetails(updatedContact.id);
+
+    logger.info('Contact unblocked', {
+      contactId,
+      userId: currentUserId,
+      contactUserId: contact.contactUserId,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Contact unblocked successfully',
+      data: { contact: fullContact },
+    });
+  } catch (error) {
+    logger.error('Error in unblockContact', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.userId,
+      contactId: req.params?.contactId,
+    });
+
+    const errorResponse = {
+      error: 'Internal Server Error',
+      message: 'Failed to unblock contact',
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = error.message;
+      errorResponse.code = error.code;
+    }
+
+    return res.status(500).json(errorResponse);
+  }
+}
+
 module.exports = {
   addContact,
   removeContact,
   listContacts,
   checkContactExists,
   updateContact,
+  blockContact,
+  unblockContact,
 };

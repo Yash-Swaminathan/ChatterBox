@@ -327,6 +327,170 @@ async function toggleFavorite(contactId) {
 }
 
 /**
+ * Toggle contact block status
+ *
+ * @param {string} contactId - UUID of the contact
+ * @param {boolean} isBlocked - New block status
+ * @returns {Promise<Object|null>} Updated contact object or null if not found
+ */
+async function toggleBlock(contactId, isBlocked) {
+  try {
+    const query = `
+      UPDATE contacts
+      SET is_blocked = $1
+      WHERE id = $2
+      RETURNING id, user_id, contact_user_id, nickname, is_blocked, is_favorite, added_at
+    `;
+
+    const result = await pool.query(query, [isBlocked, contactId]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const contact = result.rows[0];
+    logger.info('Contact block status updated', {
+      contactId,
+      isBlocked,
+    });
+
+    return {
+      id: contact.id,
+      userId: contact.user_id,
+      contactUserId: contact.contact_user_id,
+      nickname: contact.nickname,
+      isBlocked: contact.is_blocked,
+      isFavorite: contact.is_favorite,
+      addedAt: contact.added_at,
+    };
+  } catch (error) {
+    logger.error('Error toggling contact block status', {
+      error: error.message,
+      contactId,
+      isBlocked,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Check if two users have blocked each other (bidirectional check)
+ * Returns true if either user has blocked the other
+ *
+ * **Fail-Safe Error Handling:**
+ * This function returns `false` on database errors to prioritize availability over blocking enforcement.
+ * Design rationale:
+ * - Blocking is a security feature, but message delivery is critical functionality
+ * - During database outages, it's better to allow messages than block legitimate users
+ * - Alternative (fail-closed) would prevent ALL messages during transient failures
+ * - Trade-off: Brief window where blocked users could message during outages
+ *
+ * **Monitoring:** All fail-safe invocations are logged as errors for alerting.
+ * If errors are frequent, investigate database health via monitoring dashboards.
+ *
+ * @param {string} userId - First user ID
+ * @param {string} targetUserId - Second user ID
+ * @returns {Promise<boolean>} True if either user blocked the other, false on error (fail-safe)
+ */
+async function isBlocked(userId, targetUserId) {
+  try {
+    const query = `
+      SELECT EXISTS (
+        SELECT 1 FROM contacts
+        WHERE (
+          (user_id = $1 AND contact_user_id = $2 AND is_blocked = TRUE)
+          OR
+          (user_id = $2 AND contact_user_id = $1 AND is_blocked = TRUE)
+        )
+      ) as blocked
+    `;
+
+    const result = await pool.query(query, [userId, targetUserId]);
+    return result.rows[0]?.blocked || false;
+  } catch (error) {
+    logger.error('Error checking if users are blocked', {
+      error: error.message,
+      userId,
+      targetUserId,
+      failSafe: true, // Tag for monitoring/alerting
+    });
+    // Fail-safe: return false to avoid blocking legitimate messages on errors
+    return false;
+  }
+}
+
+/**
+ * Check if sender is blocked by any recipient in a conversation
+ * For 1-on-1 chats: Check if the other person blocked sender
+ * For group chats: Allow (blocking only affects 1-on-1 per requirements)
+ *
+ * **Fail-Safe Error Handling:**
+ * Returns `false` on database errors (same fail-open strategy as `isBlocked()`).
+ * See `isBlocked()` JSDoc for detailed rationale on fail-safe vs fail-closed trade-offs.
+ *
+ * @param {string} conversationId - Conversation UUID
+ * @param {string} senderId - Sender UUID
+ * @returns {Promise<boolean>} True if sender is blocked, false on error (fail-safe)
+ */
+async function isSenderBlockedInConversation(conversationId, senderId) {
+  try {
+    // Get conversation type first
+    const convQuery = 'SELECT type FROM conversations WHERE id = $1';
+    const convResult = await pool.query(convQuery, [conversationId]);
+
+    if (convResult.rows.length === 0) {
+      return false; // Conversation doesn't exist, let other validation handle it
+    }
+
+    const conversationType = convResult.rows[0].type;
+
+    // Only check blocking for direct conversations
+    if (conversationType !== 'direct') {
+      return false; // Group chats: blocking doesn't apply (per requirements)
+      // TODO (Week 7): Extend blocking to filter group message visibility
+      // Currently group messages bypass blocking per Week 6 requirements
+    }
+
+    // For direct conversations: Check if the OTHER participant has blocked sender
+    const query = `
+      SELECT EXISTS (
+        SELECT 1
+        FROM conversation_participants cp
+        INNER JOIN contacts c ON (
+          c.user_id = cp.user_id
+          AND c.contact_user_id = $2
+          AND c.is_blocked = TRUE
+        )
+        WHERE cp.conversation_id = $1
+          AND cp.user_id != $2
+          AND cp.left_at IS NULL
+      ) as blocked
+    `;
+
+    const result = await pool.query(query, [conversationId, senderId]);
+    const isBlocked = result.rows[0]?.blocked || false;
+
+    if (isBlocked) {
+      logger.warn('Message blocked due to contact blocking', {
+        conversationId,
+        senderId,
+      });
+    }
+
+    return isBlocked;
+  } catch (error) {
+    logger.error('Error checking if sender is blocked in conversation', {
+      error: error.message,
+      conversationId,
+      senderId,
+      failSafe: true, // Tag for monitoring/alerting
+    });
+    // Fail-safe: return false to avoid blocking legitimate messages on errors
+    return false;
+  }
+}
+
+/**
  * Delete a contact by ID
  *
  * @param {string} contactId - UUID of the contact
@@ -467,6 +631,9 @@ module.exports = {
   countByUser,
   updateNickname,
   toggleFavorite,
+  toggleBlock,
+  isBlocked,
+  isSenderBlockedInConversation,
   deleteContact,
   deleteByUsers,
   exists,

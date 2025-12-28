@@ -6,7 +6,9 @@ const bcrypt = require('bcryptjs');
  * @returns {Promise<string>} Hashed password
  */
 async function hashPassword(password) {
-  const saltRounds = 12; // Higher = more secure but slower to hash Randomly generated
+  // Use fewer rounds in test environment for faster test execution
+  // Production: 12 rounds (~250ms), Test: 4 rounds (~10ms)
+  const saltRounds = process.env.NODE_ENV === 'test' ? 4 : 12;
   return await bcrypt.hash(password, saltRounds);
 }
 
