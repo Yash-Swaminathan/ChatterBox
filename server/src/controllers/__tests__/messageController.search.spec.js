@@ -85,9 +85,14 @@ describe('Message Search API', () => {
       );
       testMessages.push({ id: msgResult.rows[0].id, content: messageTexts[i] });
     }
-  }, 30000); // 30 second timeout for bcrypt + DB setup
+  }, 60000); // 60 second timeout for bcrypt + DB setup
 
   afterAll(async () => {
+    // Reset soft-deleted messages first
+    await pool.query('UPDATE messages SET deleted_at = NULL WHERE conversation_id = ANY($1)', [
+      testConversations,
+    ]);
+
     // Delete in reverse dependency order to respect foreign key constraints:
     // messages → conversation_participants → conversations → users
     await pool.query('DELETE FROM messages WHERE conversation_id = ANY($1)', [testConversations]);
@@ -96,7 +101,19 @@ describe('Message Search API', () => {
     ]);
     await pool.query('DELETE FROM conversations WHERE id = ANY($1)', [testConversations]);
     await pool.query('DELETE FROM users WHERE id = ANY($1)', [testUsers.map(u => u.id)]);
-    // Don't close pool - shared across all tests
+
+    // Wait for async operations to complete before closing
+    await new Promise(resolve => setTimeout(resolve, 100));
+  });
+
+  beforeEach(async () => {
+    // Wait for any pending async operations to complete
+    await new Promise(resolve => setImmediate(resolve));
+  });
+
+  afterEach(async () => {
+    // Flush any pending async operations
+    await new Promise(resolve => setImmediate(resolve));
   });
 
   describe('1. Basic Search', () => {

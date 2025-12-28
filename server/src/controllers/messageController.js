@@ -85,14 +85,17 @@ async function getConversationMessages(req, res) {
       includeDeleted,
     });
 
-    // 4. Populate cache for first page (async, non-blocking)
+    // 4. Populate cache for first page (await to ensure deterministic test behavior)
     if (!cursor && !includeDeleted && result.messages.length > 0) {
-      MessageCacheService.setRecentMessages(conversationId, result.messages).catch(err =>
+      try {
+        await MessageCacheService.setRecentMessages(conversationId, result.messages);
+      } catch (err) {
         logger.error('Cache population error', {
           conversationId,
           error: err.message,
-        })
-      );
+        });
+        // Non-blocking: Don't fail the request if cache write fails
+      }
     }
 
     const totalTime = Date.now() - startTime;

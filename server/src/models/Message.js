@@ -541,11 +541,11 @@ class Message {
         throw new Error('Invalid cursor format. Expected: timestamp:uuid');
       }
       const [cursorTimestamp, cursorId] = parts;
-      if (cursorTimestamp && cursorId) {
-        sql += ` AND (m.created_at, m.id) < ($${paramIndex}, $${paramIndex + 1})`;
-        params.push(cursorTimestamp, cursorId);
-        paramIndex += 2;
-      }
+      // Use composite comparison with explicit type casts to handle identical timestamps
+      // When timestamps are equal, ID is used as tiebreaker for deterministic ordering
+      sql += ` AND (m.created_at < $${paramIndex}::timestamp OR (m.created_at = $${paramIndex}::timestamp AND m.id < $${paramIndex + 1}::uuid))`;
+      params.push(cursorTimestamp, cursorTimestamp, cursorId);
+      paramIndex += 3;
     }
 
     sql += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${paramIndex}`;
