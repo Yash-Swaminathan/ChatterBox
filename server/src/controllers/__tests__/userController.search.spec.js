@@ -297,7 +297,7 @@ describe('User Controller - Search', () => {
         expect(response.status).toBe(400);
         expect(response.body.success).toBe(false);
         expect(response.body.error.code).toBe('VALIDATION_ERROR');
-        expect(response.body.error.message).toContain('excludeContacts must be true or false');
+        expect(response.body.error.message).toBe('excludeContacts must be true or false');
       });
 
       it('should exclude existing contacts when excludeContacts=true', async () => {
@@ -381,7 +381,7 @@ describe('User Controller - Search', () => {
           expect(response.status).toBe(400);
           expect(response.body.success).toBe(false);
           expect(response.body.error.code).toBe('VALIDATION_ERROR');
-          expect(response.body.error.message).toContain('excludeContacts must be true or false');
+          expect(response.body.error.message).toBe('excludeContacts must be true or false');
         }
       });
 

@@ -170,7 +170,8 @@ async function searchUsers(req, res) {
     // Get pagination parameters
     const { limit, offset } = getPaginationParams(req);
 
-    // Parse excludeContacts parameter (default: false)
+    // Parse excludeContacts parameter (middleware ensures it's 'true' or 'false' string if present)
+    // Defaults to false if not provided for backward compatibility
     const shouldExcludeContacts = excludeContacts === 'true';
 
     // TODO: CACHING OPTIMIZATION (Future)
@@ -178,6 +179,7 @@ async function searchUsers(req, res) {
     // const cacheKey = `search:${query}:${limit}:${offset}:${shouldExcludeContacts}`;
     // TTL: 30-60 seconds (balance freshness vs performance)
     // This reduces DB load for repeated searches
+    // Cache invalidation needed on: contact add/remove, user profile updates
     // Priority: Medium (implement when search load increases)
 
     // Search users (with blocking filter and optional contact exclusion)
