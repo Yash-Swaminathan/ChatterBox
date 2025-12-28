@@ -377,9 +377,20 @@ async function toggleBlock(contactId, isBlocked) {
  * Check if two users have blocked each other (bidirectional check)
  * Returns true if either user has blocked the other
  *
+ * **Fail-Safe Error Handling:**
+ * This function returns `false` on database errors to prioritize availability over blocking enforcement.
+ * Design rationale:
+ * - Blocking is a security feature, but message delivery is critical functionality
+ * - During database outages, it's better to allow messages than block legitimate users
+ * - Alternative (fail-closed) would prevent ALL messages during transient failures
+ * - Trade-off: Brief window where blocked users could message during outages
+ *
+ * **Monitoring:** All fail-safe invocations are logged as errors for alerting.
+ * If errors are frequent, investigate database health via monitoring dashboards.
+ *
  * @param {string} userId - First user ID
  * @param {string} targetUserId - Second user ID
- * @returns {Promise<boolean>} True if either user blocked the other
+ * @returns {Promise<boolean>} True if either user blocked the other, false on error (fail-safe)
  */
 async function isBlocked(userId, targetUserId) {
   try {
@@ -401,6 +412,7 @@ async function isBlocked(userId, targetUserId) {
       error: error.message,
       userId,
       targetUserId,
+      failSafe: true, // Tag for monitoring/alerting
     });
     // Fail-safe: return false to avoid blocking legitimate messages on errors
     return false;
@@ -412,9 +424,13 @@ async function isBlocked(userId, targetUserId) {
  * For 1-on-1 chats: Check if the other person blocked sender
  * For group chats: Allow (blocking only affects 1-on-1 per requirements)
  *
+ * **Fail-Safe Error Handling:**
+ * Returns `false` on database errors (same fail-open strategy as `isBlocked()`).
+ * See `isBlocked()` JSDoc for detailed rationale on fail-safe vs fail-closed trade-offs.
+ *
  * @param {string} conversationId - Conversation UUID
  * @param {string} senderId - Sender UUID
- * @returns {Promise<boolean>} True if sender is blocked
+ * @returns {Promise<boolean>} True if sender is blocked, false on error (fail-safe)
  */
 async function isSenderBlockedInConversation(conversationId, senderId) {
   try {
@@ -467,6 +483,7 @@ async function isSenderBlockedInConversation(conversationId, senderId) {
       error: error.message,
       conversationId,
       senderId,
+      failSafe: true, // Tag for monitoring/alerting
     });
     // Fail-safe: return false to avoid blocking legitimate messages on errors
     return false;
