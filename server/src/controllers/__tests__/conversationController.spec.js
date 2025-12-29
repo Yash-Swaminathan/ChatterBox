@@ -527,4 +527,328 @@ describe('Conversation Controller Integration Tests', () => {
       expect(response.body.conversation.participants[0].username).toBe('🚀 test user 👍');
     });
   });
+
+  describe('POST /api/conversations/group', () => {
+    let creatorId;
+    let user2Id;
+    let user3Id;
+    let creatorToken;
+
+    beforeAll(() => {
+      creatorId = '550e8400-e29b-41d4-a716-446655440010';
+      user2Id = '550e8400-e29b-41d4-a716-446655440011';
+      user3Id = '550e8400-e29b-41d4-a716-446655440012';
+      creatorToken = generateAccessToken({
+        userId: creatorId,
+        username: 'creator',
+        email: 'creator@example.com',
+      });
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      User.findByIds = jest.fn();
+      Conversation.createGroup = jest.fn();
+      Conversation.findById = jest.fn();
+      getBulkPresence.mockResolvedValue({
+        [creatorId]: { status: 'online' },
+        [user2Id]: { status: 'offline' },
+        [user3Id]: { status: 'online' },
+      });
+    });
+
+    it('should create group with provided name', async () => {
+      const participantIds = [creatorId, user2Id, user3Id];
+
+      User.findByIds.mockResolvedValue([
+        { id: creatorId, username: 'creator' },
+        { id: user2Id, username: 'user2' },
+        { id: user3Id, username: 'user3' },
+      ]);
+
+      Conversation.createGroup.mockResolvedValue({
+        conversation: {
+          id: 'group-123',
+          type: 'group',
+          name: 'Project Team',
+          created_by: creatorId,
+        },
+        created: true,
+      });
+
+      Conversation.findById.mockResolvedValue({
+        id: 'group-123',
+        type: 'group',
+        name: 'Project Team',
+        created_by: creatorId,
+        participants: [
+          { userId: creatorId, username: 'creator' },
+          { userId: user2Id, username: 'user2' },
+          { userId: user3Id, username: 'user3' },
+        ],
+      });
+
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({
+          participantIds,
+          name: 'Project Team',
+        })
+        .expect(201);
+
+      expect(response.body.conversation).toBeDefined();
+      expect(response.body.conversation.name).toBe('Project Team');
+      expect(response.body.conversation.type).toBe('group');
+      expect(response.body.created).toBe(true);
+      expect(User.findByIds).toHaveBeenCalledWith(participantIds);
+      expect(Conversation.createGroup).toHaveBeenCalledWith(creatorId, participantIds, {
+        name: 'Project Team',
+        avatarUrl: undefined,
+      });
+    });
+
+    it('should create group with auto-generated name if not provided', async () => {
+      const participantIds = [creatorId, user2Id, user3Id];
+
+      User.findByIds.mockResolvedValue([
+        { id: creatorId, username: 'alice' },
+        { id: user2Id, username: 'bob' },
+        { id: user3Id, username: 'carol' },
+      ]);
+
+      Conversation.createGroup.mockResolvedValue({
+        conversation: {
+          id: 'group-456',
+          type: 'group',
+          name: 'alice, bob, and 1 other', // Auto-generated
+          created_by: creatorId,
+        },
+        created: true,
+      });
+
+      Conversation.findById.mockResolvedValue({
+        id: 'group-456',
+        type: 'group',
+        name: 'alice, bob, and 1 other',
+        created_by: creatorId,
+        participants: [
+          { userId: creatorId, username: 'alice' },
+          { userId: user2Id, username: 'bob' },
+          { userId: user3Id, username: 'carol' },
+        ],
+      });
+
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({ participantIds })
+        .expect(201);
+
+      expect(response.body.conversation.name).toBe('alice, bob, and 1 other');
+      expect(Conversation.createGroup).toHaveBeenCalledWith(creatorId, participantIds, {
+        name: undefined,
+        avatarUrl: undefined,
+      });
+    });
+
+    it('should reject if creator not in participantIds', async () => {
+      const user4Id = '550e8400-e29b-41d4-a716-446655440013';
+      const participantIds = [user2Id, user3Id, user4Id]; // Missing creator (but has 3 participants)
+
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({ participantIds })
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+      expect(response.body.message).toContain('Creator must be included');
+    });
+
+    it('should reject if less than 3 participants', async () => {
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({ participantIds: [creatorId, user2Id] })
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+      expect(response.body.message).toContain('at least 3 participants');
+    });
+
+    it('should reject if participant not found', async () => {
+      const nonExistentId = '550e8400-e29b-41d4-a716-446655440999';
+      const participantIds = [creatorId, user2Id, nonExistentId];
+
+      User.findByIds.mockResolvedValue([
+        { id: creatorId, username: 'creator' },
+        { id: user2Id, username: 'user2' },
+        // nonExistentId not in results
+      ]);
+
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({ participantIds })
+        .expect(404);
+
+      expect(response.body.error).toBe('Not Found');
+      expect(response.body.message).toContain('User(s) not found');
+    });
+
+    it('should reject if participantIds has duplicates', async () => {
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({ participantIds: [creatorId, user2Id, user2Id] })
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+      expect(response.body.message).toContain('must not contain duplicates');
+    });
+
+    it('should reject if more than 100 participants', async () => {
+      const tooManyParticipants = Array(101)
+        .fill()
+        .map((_, i) => `550e8400-e29b-41d4-a716-4466554400${String(i).padStart(2, '0')}`);
+
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({ participantIds: tooManyParticipants })
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+      expect(response.body.message).toContain('cannot have more than 100 participants');
+    });
+
+    it('should reject if name is empty string', async () => {
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({
+          participantIds: [creatorId, user2Id, user3Id],
+          name: '   ', // Only whitespace
+        })
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+      expect(response.body.message).toContain('must not be empty');
+    });
+
+    it('should reject if name exceeds 100 characters', async () => {
+      const longName = 'A'.repeat(101);
+
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({
+          participantIds: [creatorId, user2Id, user3Id],
+          name: longName,
+        })
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+      expect(response.body.message).toContain('must not exceed 100 characters');
+    });
+
+    it('should reject if avatarUrl is invalid', async () => {
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({
+          participantIds: [creatorId, user2Id, user3Id],
+          avatarUrl: 'not-a-valid-url',
+        })
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation Error');
+      expect(response.body.message).toContain('must be a valid URL');
+    });
+
+    it('should create group with avatarUrl', async () => {
+      const participantIds = [creatorId, user2Id, user3Id];
+      const avatarUrl = 'https://example.com/avatar.png';
+
+      User.findByIds.mockResolvedValue([
+        { id: creatorId, username: 'creator' },
+        { id: user2Id, username: 'user2' },
+        { id: user3Id, username: 'user3' },
+      ]);
+
+      Conversation.createGroup.mockResolvedValue({
+        conversation: {
+          id: 'group-789',
+          type: 'group',
+          name: 'Team',
+          avatar_url: avatarUrl,
+          created_by: creatorId,
+        },
+        created: true,
+      });
+
+      Conversation.findById.mockResolvedValue({
+        id: 'group-789',
+        type: 'group',
+        name: 'Team',
+        avatar_url: avatarUrl,
+        created_by: creatorId,
+        participants: [
+          { userId: creatorId, username: 'creator' },
+          { userId: user2Id, username: 'user2' },
+          { userId: user3Id, username: 'user3' },
+        ],
+      });
+
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({ participantIds, name: 'Team', avatarUrl })
+        .expect(201);
+
+      expect(response.body.conversation.avatar_url).toBe(avatarUrl);
+      expect(Conversation.createGroup).toHaveBeenCalledWith(creatorId, participantIds, {
+        name: 'Team',
+        avatarUrl,
+      });
+    });
+
+    it('should enrich participants with presence data', async () => {
+      const participantIds = [creatorId, user2Id, user3Id];
+
+      User.findByIds.mockResolvedValue([
+        { id: creatorId, username: 'creator' },
+        { id: user2Id, username: 'user2' },
+        { id: user3Id, username: 'user3' },
+      ]);
+
+      Conversation.createGroup.mockResolvedValue({
+        conversation: { id: 'group-presence', type: 'group', name: 'Test' },
+        created: true,
+      });
+
+      Conversation.findById.mockResolvedValue({
+        id: 'group-presence',
+        type: 'group',
+        name: 'Test',
+        participants: [
+          { userId: creatorId, username: 'creator' },
+          { userId: user2Id, username: 'user2' },
+          { userId: user3Id, username: 'user3' },
+        ],
+      });
+
+      const response = await request(app)
+        .post('/api/conversations/group')
+        .set('Authorization', `Bearer ${creatorToken}`)
+        .send({ participantIds, name: 'Test' })
+        .expect(201);
+
+      expect(response.body.conversation.participants[0].status).toBe('online');
+      expect(response.body.conversation.participants[1].status).toBe('offline');
+      expect(response.body.conversation.participants[2].status).toBe('online');
+      expect(getBulkPresence).toHaveBeenCalledWith(participantIds);
+    });
+  });
 });
