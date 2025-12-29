@@ -559,9 +559,12 @@ SELECT m.created_at FROM messages m...
 - [ ] Integration tests: full group lifecycle
 
 **Key Simplification:**
-- No typing indicators for groups (defer to post-launch)
-- No group-specific permissions beyond admin/member
-- No group invite links (just direct add)
+- No typing indicators for groups (defer to Week 17 - see [WEEK7-8_SIMPLIFICATIONS.md](.claude/WEEK7-8_SIMPLIFICATIONS.md))
+- No enhanced message mentions with autocomplete (defer to Week 17)
+- No group-specific permissions beyond admin/member (defer to Week 18)
+- No group invite links (defer to Week 18 - just direct add for MVP)
+- No group archiving/muting endpoints (defer to Week 18 - schema exists)
+- No group read receipt aggregation UI (defer to Week 17)
 
 **Deliverables:**
 - Full group CRUD (create, add members, remove, leave)
@@ -3728,11 +3731,11 @@ chatterbox/
 
 ---
 
-### 🚀 WEEK 17: Scaling & Production Enhancements (7 hours)
+### 🚀 WEEK 17: Group Enhancements & Edit History (7 hours)
 
-**Goal**: Implement full-featured versions of Week 5-10 simplifications + production scaling optimizations
+**Goal**: Implement deferred Week 7-8 group features + full edit history (see [WEEK7-8_SIMPLIFICATIONS.md](.claude/WEEK7-8_SIMPLIFICATIONS.md))
 
-**Why This Week Matters**: Week 10 deployment used simplified implementations for speed. Now that you're live, add the robust, scalable versions that differentiate your resume from junior developers.
+**Why This Week Matters**: Week 10 deployment used simplified group messaging. Now add the production-grade group features that differentiate your resume from junior developers.
 
 **Day 1-2: Full Edit History Implementation (2.5 hours)**
 - [ ] Create message_edit_history table
@@ -3759,8 +3762,8 @@ chatterbox/
   - Click to expand full previous version
 - [ ] Tests: edit history persistence, concurrent edits, rollback capability
 
-**Day 3: Enhanced Typing Indicators Backend (1.5 hours)**
-- [ ] Implement typing indicators for group chats (skipped in Week 10)
+**Day 3: Enhanced Typing Indicators for Groups (1.5 hours)** - Deferred from Week 8
+- [ ] Implement typing indicators for group chats
   - Broadcast typing status to all group participants
   - Aggregate typing users: "Alice, Bob, and 2 others are typing..."
   - Debounce on server-side (prevent spam)
@@ -3771,66 +3774,85 @@ chatterbox/
 - [ ] Socket event optimization
   - Batch typing updates (send max 1 update per 500ms)
   - Stop broadcasting if >5 users typing (show "Several people are typing")
+- [ ] Frontend: Display multiple users typing at once
 - [ ] Tests: group typing, Redis TTL expiry, batch updates
 
-**Day 4: Production Database Optimization (2 hours)**
-- [ ] Implement read replicas (if using AWS RDS or similar)
-  - Route read-heavy queries to replica
-  - Master for writes, replica for: message history, user search, contact lists
-  - Add connection pool for replica: `pgReplica.Pool`
-- [ ] Advanced indexing strategies
-  - Covering indexes to avoid table lookups
-  - Expression indexes for computed columns
-  - Example: `CREATE INDEX idx_users_search ON users(LOWER(username), LOWER(email))`
-- [ ] Query optimization audit
-  - Run EXPLAIN ANALYZE on top 10 slowest queries
-  - Refactor N+1 queries with JOINs or batch loading
-  - Document before/after performance metrics
-- [ ] Connection pool tuning
-  - Set max connections based on Railway plan
-  - Implement query timeout (10 seconds max)
-  - Add slow query logging (>100ms queries)
+**Day 4: Group Read Receipts Aggregation (1.5 hours)** - Deferred from Week 8
+- [ ] GET /api/messages/:messageId/read-by endpoint
+  - Return list of users who read the message
+  - Include timestamps
+  - Group by read/unread status
+- [ ] Socket.io: Enhanced read status broadcasting
+  - Aggregate read receipts for groups
+  - Emit once with array of user IDs instead of N events
+- [ ] Frontend: Group read receipt UI
+  - Message footer: "Read by Alice, Bob, and 3 others"
+  - Click to expand full list with timestamps
+  - Show avatars of readers
+- [ ] Optimize for large groups (100+ participants)
+  - Only show top 5 readers + count
+  - Lazy load full list on demand
+- [ ] Tests: aggregation, large groups, UI rendering
 
-**Day 5-7: Horizontal Scaling Preparation (1 hour)**
-- [ ] Redis-based rate limiting (currently in-memory Map)
-  - Replace in-memory rate limiter with Redis INCR
-  - Key: `ratelimit:{userId}:{endpoint}`
-  - TTL: window duration (e.g., 60 seconds)
-  - Supports multiple server instances
-- [ ] Sticky session configuration (Nginx)
-  - Update nginx.conf with `ip_hash` for WebSocket stickiness
-  - Test multi-server deployment locally (docker-compose with 2 backend instances)
-  - Verify Socket.io Redis adapter syncs across instances
-- [ ] Health check enhancements
-  - Add /health/ready endpoint (checks DB + Redis connectivity)
-  - Add /health/live endpoint (basic liveness probe)
-  - Kubernetes-ready health checks
-- [ ] Graceful shutdown improvements
-  - Wait for in-flight requests to complete (max 30s)
-  - Close database connections properly
-  - Flush Winston logs before exit
+**Day 5-7: Enhanced Message Mentions (2.5 hours)** - Deferred from Week 8
+- [ ] Create message_mentions table
+  ```sql
+  CREATE TABLE message_mentions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    mentioned_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(message_id, mentioned_user_id)
+  );
+  CREATE INDEX idx_mentions_user ON message_mentions(mentioned_user_id);
+  CREATE INDEX idx_mentions_message ON message_mentions(message_id);
+  ```
+- [ ] Server-side mention parsing
+  - Extract @username from message content
+  - Validate mentioned users are group participants
+  - Store in message_mentions table
+- [ ] Socket.io notifications
+  - Emit mention:received to mentioned user
+  - Include message preview and conversation context
+- [ ] Frontend: Mention autocomplete
+  - Show participant list when typing @
+  - Filter by username as user types
+  - Insert mention on selection
+- [ ] Frontend: Mention highlighting
+  - Highlight @username in blue/accent color
+  - Make mentions clickable (navigate to user profile)
+- [ ] GET /api/messages/mentions endpoint
+  - Retrieve all messages where user was mentioned
+  - Pagination support
+  - Mark as read functionality
+- [ ] Unread mention badge
+  - Show count of unread mentions
+  - Separate from general unread count
+- [ ] Tests: mention parsing, autocomplete, notifications
 
 **Resume Bullets:**
-- "Implemented message edit history with full audit trail, storing 1000+ edits with rollback capability"
-- "Optimized database performance with read replicas and covering indexes, reducing query latency by 40%"
-- "Configured horizontal scaling with Redis-based rate limiting and sticky sessions, supporting 5000+ concurrent users"
+- "Implemented message edit history with full audit trail, storing 1000+ edits with rollback capability using PostgreSQL transactions"
+- "Built group typing indicator system with Redis pub/sub, aggregating typing status from 50+ concurrent users with <100ms latency"
+- "Developed message mention system with autocomplete UI and real-time notifications, processing 500+ mentions daily"
+- "Optimized group read receipts with aggregation queries, reducing response time by 60% for 100+ participant groups"
 
 **Deliverables:**
 - Full edit history UI with diff view
-- Production-grade typing indicators
-- Database read replica support
-- Redis-based rate limiting
-- Multi-server deployment tested
+- Production-grade typing indicators for groups
+- Enhanced message mentions with autocomplete
+- Group read receipt aggregation
+- All deferred Week 7-8 group features implemented
 
-**✅ Milestone 16**: **PRODUCTION-READY AT SCALE! 🚀**
+**✅ Milestone 16**: **GROUP MESSAGING FEATURE-COMPLETE! 🚀**
 
 ---
 
-### 🚀 WEEK 18: Social Features & Contact Enhancements (7 hours)
+### 🚀 WEEK 18: Contact Requests & Advanced Group Features (7 hours)
 
-**Goal**: Add friend request system and enhance contact management with mutual consent workflow
+**Goal**: Add friend request system + remaining deferred Week 7-8 group features (see [WEEK7-8_SIMPLIFICATIONS.md](.claude/WEEK7-8_SIMPLIFICATIONS.md))
 
-**Deferred from Week 6**: Week 6 used instant contact addition for MVP. Now add production-grade friend request system.
+**Deferred from Week 6**: Friend request system with mutual consent workflow
+**Deferred from Week 8**: Group invite links, permissions, archiving/muting
 
 **Day 1: Contact Request Database & Model (1 hour)**
 - [ ] Create contact_requests table (migration 020)
@@ -3870,69 +3892,108 @@ chatterbox/
 - [ ] Write 30+ integration tests
   - All endpoints, Socket.io events, edge cases
 
-**Day 3-4: Migration Path & Frontend UI (1.5 hours)**
-- [ ] Update POST /api/contacts endpoint
-  - Option 1: Deprecate (return 410 Gone)
-  - Option 2: Admin-only (for testing)
-  - Option 3: Auto-convert to request workflow
-  - **Recommendation**: Option 1 (deprecate)
-- [ ] Backward compatibility tests
-  - Existing contacts from Week 6-10 continue working
-  - No retroactive request creation needed
-- [ ] Frontend: Request workflow UI
-  - Change "Add Contact" → "Send Request" button
-  - Pending requests badge in sidebar
-  - Notification bell for new requests
-  - Accept/Reject buttons in request list
-  - Request message display
+**Day 3: Group Join Links & Invites (2 hours)** - Deferred from Week 8
+- [ ] Create group_invites table
+  ```sql
+  CREATE TABLE group_invites (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    invite_code VARCHAR(50) UNIQUE NOT NULL, -- Random 16-char code
+    created_by UUID NOT NULL REFERENCES users(id),
+    expires_at TIMESTAMP,
+    max_uses INTEGER DEFAULT NULL, -- NULL = unlimited
+    uses_count INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX idx_invites_code ON group_invites(invite_code);
+  CREATE INDEX idx_invites_conversation ON group_invites(conversation_id);
+  ```
+- [ ] POST /api/conversations/:id/invites endpoint
+  - Generate shareable invite link
+  - Body: { expiresIn?: number, maxUses?: number }
+  - Return: { inviteCode: string, inviteUrl: string }
+- [ ] POST /api/invites/:inviteCode/join endpoint
+  - User joins group via invite code
+  - Validate: invite active, not expired, under max uses
+  - Add user to conversation_participants
+  - Increment uses_count
+  - Socket event: conversation:participant-added
+- [ ] DELETE /api/conversations/:id/invites/:inviteId endpoint
+  - Revoke invite (admin only)
+  - Set is_active = false
+- [ ] GET /api/conversations/:id/invites endpoint
+  - List all active invites for group (admin only)
+- [ ] Frontend: Invite link UI
+  - "Invite to Group" button
+  - Generate link modal
+  - Copy to clipboard functionality
+  - Show active invites and revoke option
+- [ ] Tests: invite generation, expiry, max uses, revocation
 
-**Day 5-6: Mutual Contact Suggestions (2 hours)**
-- [ ] Enhance GET /api/contacts/suggestions endpoint
-  - Algorithm: Friends of friends (mutual contacts)
-  - SQL: Use INTERSECT or JOIN on contacts table
-  - Exclude: Already contacts, blocked users, pending requests
-  - Limit: 20 suggestions, randomize order
-  - Cache in Redis (TTL: 1 hour)
-- [ ] GET /api/contacts/:contactId/mutual endpoint
-  - Return list of mutual contacts with profiles
-  - Pagination: limit, offset
-- [ ] Add mutual contact count to user profiles
-  - Display: "X mutual contacts" on profile view
-  - Cache result in Redis (TTL: 5 minutes)
-- [ ] Frontend: Mutual contacts display
-  - Show avatars/names of mutual connections
-  - Click to expand full list
-  - Integrate into friend request flow
+**Day 4: Group Permissions & Roles (1.5 hours)** - Deferred from Week 8
+- [ ] Create group_permissions table
+  ```sql
+  CREATE TABLE group_permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    permission_name VARCHAR(50) NOT NULL,
+    allowed_roles TEXT[] DEFAULT '{"admin"}', -- Array of roles
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(conversation_id, permission_name)
+  );
+  ```
+- [ ] PUT /api/conversations/:id/permissions endpoint
+  - Admin can customize permissions per group
+  - Body: { permissionName: string, allowedRoles: string[] }
+  - Supported permissions: can_send_messages, can_add_participants, can_change_settings, can_pin_messages
+- [ ] Middleware: checkGroupPermission()
+  - Verify user has required permission for action
+  - Use in all group-related endpoints
+- [ ] Frontend: Group settings UI
+  - Permission management page (admin only)
+  - Checkboxes for each role and permission
+- [ ] Tests: permission checks, unauthorized attempts
 
-**Day 7: Notification System Polish (1 hour)**
-- [ ] Batch notification delivery
-  - Group multiple requests into single notification
-  - "Alice and 3 others sent you contact requests"
-- [ ] Request expiry system
-  - Background job: Delete rejected requests after 30 days
-  - Background job: Auto-reject requests after 90 days
-  - Cron job using node-cron package
-- [ ] Analytics tracking
-  - Acceptance rate (accepted / sent)
-  - Average response time
-  - Log to Winston for analysis
+**Day 5: Group Archiving & Muting (1 hour)** - Deferred from Week 8
+- [ ] PUT /api/conversations/:id/mute endpoint
+  - Body: { muted: boolean }
+  - Update conversation_participants.is_muted
+  - Socket event: conversation:muted
+- [ ] PUT /api/conversations/:id/archive endpoint
+  - Update conversation_participants.is_archived
+  - Socket event: conversation:archived
+- [ ] GET /api/conversations?archived=true endpoint
+  - Filter for archived conversations
+  - Pagination support
+- [ ] Frontend: Mute/Archive UI
+  - Long-press context menu on conversation
+  - "Mute notifications" toggle
+  - "Archive conversation" option
+  - Archived conversations folder
+- [ ] Notification logic
+  - Skip push notifications for muted conversations
+  - Show unread badge for muted (but silent)
+- [ ] Tests: mute/unmute, archive/unarchive, notification filtering
 
 **Resume Bullets:**
 - "Built friend request system with mutual consent workflow, processing 500+ requests daily with Socket.io real-time notifications"
-- "Implemented backward-compatible database migration, preserving 1000+ existing contacts while enabling new request-based workflow"
-- "Designed friend-of-friend suggestion algorithm, improving contact discovery by 60% through social graph analysis"
+- "Developed group invite link system with expiration and usage limits, enabling viral growth with 70% invite acceptance rate"
+- "Implemented granular group permission system with role-based access control, supporting 4 permission types across 100+ groups"
+- "Designed group archiving and muting functionality, reducing notification spam by 50% while maintaining user engagement"
 
 **Deliverables:**
-- contact_requests table with 3 indexes
-- ContactRequest model with 8 methods
-- 5 new REST endpoints (send, list, accept, reject, cancel)
+- contact_requests table with friend request workflow
+- ContactRequest model with 8 methods + 55+ tests
+- group_invites table with shareable link system
+- group_permissions table with role-based access
+- Mute/Archive endpoints (using existing schema columns)
+- 5 new REST endpoints for contact requests
+- 6 new REST endpoints for group features
 - 4 Socket.io events for real-time notifications
-- 55+ tests passing (25 model + 30 controller)
 - Backward compatibility with Week 6 contacts
-- Friend suggestion algorithm
-- Notification batching system
 
-**✅ Milestone 17**: Friend request system with mutual consent and social suggestions
+**✅ Milestone 17**: **ALL WEEK 7-8 FEATURES IMPLEMENTED! 🎉**
 
 ---
 
