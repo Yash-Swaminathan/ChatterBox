@@ -2,62 +2,73 @@ const request = require('supertest');
 const app = require('../../app');
 const { pool } = require('../../config/database');
 const { generateAccessToken } = require('../../utils/jwt');
-const { hashPassword } = require('../../utils/bcrypt');
+const {
+  beginTestTransaction,
+  rollbackTestTransaction,
+  createTestUser,
+  createTestConversation,
+  addTestParticipant,
+  createTestMessage,
+} = require('../../__tests__/testUtils');
 
 describe('Message Search API', () => {
+  let testClient; // PostgreSQL client with transaction
   const testUsers = [];
   const testConversations = [];
   const testMessages = [];
   const authTokens = {};
 
   beforeAll(async () => {
-    await pool.query('DELETE FROM messages');
-    await pool.query('DELETE FROM conversation_participants');
-    await pool.query('DELETE FROM conversations');
-    await pool.query("DELETE FROM users WHERE email LIKE '%test-search-%'");
+    // Start transaction for test isolation
+    testClient = await beginTestTransaction();
 
-    const userCount = 3;
-    for (let i = 0; i < userCount; i++) {
-      const hashedPassword = await hashPassword('Password123');
-      const result = await pool.query(
-        `INSERT INTO users (username, email, password_hash, is_active, email_verified)
-         VALUES ($1, $2, $3, true, true)
-         RETURNING id, username, email`,
-        [`searchuser${i}`, `test-search-${i}@example.com`, hashedPassword]
-      );
-      testUsers.push(result.rows[0]);
-      authTokens[result.rows[0].id] = generateAccessToken({
-        userId: result.rows[0].id,
-        username: result.rows[0].username,
+    // Mock pool.query to use testClient
+    const originalPoolQuery = pool.query;
+    pool.query = testClient.query.bind(testClient);
+    testClient._originalPoolQuery = originalPoolQuery;
+
+    // Create 3 test users using helper
+    for (let i = 0; i < 3; i++) {
+      const user = await createTestUser(testClient, {
+        username: `searchuser${i}`,
+        email: `test-search-${i}@example.com`,
+      });
+      testUsers.push(user);
+      authTokens[user.id] = generateAccessToken({
+        userId: user.id,
+        username: user.username,
       });
     }
 
-    const convResult1 = await pool.query(
-      `INSERT INTO conversations (type)
-       VALUES ('direct')
-       RETURNING id`
-    );
-    testConversations.push(convResult1.rows[0].id);
+    // Create conversation 1: users[0] and users[1]
+    const conv1 = await createTestConversation(testClient, { type: 'direct' });
+    testConversations.push(conv1.id);
+    await addTestParticipant(testClient, {
+      conversationId: conv1.id,
+      userId: testUsers[0].id,
+      isAdmin: false,
+    });
+    await addTestParticipant(testClient, {
+      conversationId: conv1.id,
+      userId: testUsers[1].id,
+      isAdmin: false,
+    });
 
-    await pool.query(
-      `INSERT INTO conversation_participants (conversation_id, user_id)
-       VALUES ($1, $2), ($1, $3)`,
-      [testConversations[0], testUsers[0].id, testUsers[1].id]
-    );
+    // Create conversation 2: users[0] and users[2]
+    const conv2 = await createTestConversation(testClient, { type: 'direct' });
+    testConversations.push(conv2.id);
+    await addTestParticipant(testClient, {
+      conversationId: conv2.id,
+      userId: testUsers[0].id,
+      isAdmin: false,
+    });
+    await addTestParticipant(testClient, {
+      conversationId: conv2.id,
+      userId: testUsers[2].id,
+      isAdmin: false,
+    });
 
-    const convResult2 = await pool.query(
-      `INSERT INTO conversations (type)
-       VALUES ('direct')
-       RETURNING id`
-    );
-    testConversations.push(convResult2.rows[0].id);
-
-    await pool.query(
-      `INSERT INTO conversation_participants (conversation_id, user_id)
-       VALUES ($1, $2), ($1, $3)`,
-      [testConversations[1], testUsers[0].id, testUsers[2].id]
-    );
-
+    // Create test messages with searchable content
     const messageTexts = [
       'Hello world, this is a test message',
       'Running through the forest quickly',
@@ -73,37 +84,22 @@ describe('Message Search API', () => {
 
     for (let i = 0; i < messageTexts.length; i++) {
       const convId = i % 2 === 0 ? testConversations[0] : testConversations[1];
-      // Use participants that are actually in each conversation:
-      // conv[0] has users[0] and users[1], conv[1] has users[0] and users[2]
       const senderId = i % 2 === 0 ? testUsers[0].id : testUsers[2].id;
 
-      const msgResult = await pool.query(
-        `INSERT INTO messages (conversation_id, sender_id, content)
-         VALUES ($1, $2, $3)
-         RETURNING id`,
-        [convId, senderId, messageTexts[i]]
-      );
-      testMessages.push({ id: msgResult.rows[0].id, content: messageTexts[i] });
+      const msg = await createTestMessage(testClient, {
+        conversationId: convId,
+        senderId: senderId,
+        content: messageTexts[i],
+      });
+      testMessages.push({ id: msg.id, content: messageTexts[i] });
     }
   }, 60000); // 60 second timeout for bcrypt + DB setup
 
   afterAll(async () => {
-    // Reset soft-deleted messages first
-    await pool.query('UPDATE messages SET deleted_at = NULL WHERE conversation_id = ANY($1)', [
-      testConversations,
-    ]);
-
-    // Delete in reverse dependency order to respect foreign key constraints:
-    // messages → conversation_participants → conversations → users
-    await pool.query('DELETE FROM messages WHERE conversation_id = ANY($1)', [testConversations]);
-    await pool.query('DELETE FROM conversation_participants WHERE conversation_id = ANY($1)', [
-      testConversations,
-    ]);
-    await pool.query('DELETE FROM conversations WHERE id = ANY($1)', [testConversations]);
-    await pool.query('DELETE FROM users WHERE id = ANY($1)', [testUsers.map(u => u.id)]);
-
-    // Wait for async operations to complete before closing
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Restore original pool.query
+    pool.query = testClient._originalPoolQuery;
+    // Rollback transaction (automatic cleanup - no manual DELETE needed!)
+    await rollbackTestTransaction(testClient);
   });
 
   describe('1. Basic Search', () => {
