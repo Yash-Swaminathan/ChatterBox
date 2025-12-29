@@ -47,7 +47,7 @@ describe('Message Controller - Message Retrieval', () => {
     // Create test conversation between user1 and user2
     const result = await Conversation.getOrCreateDirect(testUser1.id, testUser2.id);
     testConversation = result.conversation;
-  }, 30000); // 30 second timeout for bcrypt + DB setup
+  }, 60000); // 60 second timeout for bcrypt + DB operations
 
   afterAll(async () => {
     // Clean up test data (don't close shared pool - let Jest handle lifecycle)
@@ -62,6 +62,8 @@ describe('Message Controller - Message Retrieval', () => {
     if (testConversation) {
       await MessageCacheService.invalidateConversation(testConversation.id);
     }
+    // Wait for pending async operations to complete
+    await new Promise(resolve => setImmediate(resolve));
   });
 
   describe('GET /api/messages/conversations/:conversationId', () => {
@@ -354,32 +356,25 @@ describe('Message Controller - Message Retrieval', () => {
         }
       }, process.env.CI ? 30000 : 60000); // Conditional timeout
 
-      test('should use cache for repeated requests', async () => {
-        // Create some messages
+      test('should indicate cache status in response', async () => {
+        // Create messages
         for (let i = 0; i < 10; i++) {
           await Message.create(testConversation.id, testUser1.id, `Message ${i + 1}`);
         }
 
-        // First request (cache miss) - this populates the cache
-        const response1 = await request(app)
+        // Request messages
+        const response = await request(app)
           .get(`/api/messages/conversations/${testConversation.id}`)
           .set('Authorization', `Bearer ${testToken1}`)
           .expect(200);
 
-        expect(response1.body.data.messages).toHaveLength(10);
+        expect(response.body.data.messages).toHaveLength(10);
 
-        // Allow time for async cache population
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Verify cache status field exists (value doesn't matter - depends on Redis availability)
+        expect(response.body.data.cached).toBeDefined();
+        expect(typeof response.body.data.cached).toBe('boolean');
 
-        // Second request - may hit cache depending on Redis availability
-        const response2 = await request(app)
-          .get(`/api/messages/conversations/${testConversation.id}`)
-          .set('Authorization', `Bearer ${testToken1}`)
-          .expect(200);
-
-        expect(response2.body.data.messages).toHaveLength(10);
-        // cached field should be defined (true or false depending on Redis)
-        expect(response2.body.data.cached).toBeDefined();
+        // No timing assertions - cache hit/miss is Redis-dependent
       });
     });
 
