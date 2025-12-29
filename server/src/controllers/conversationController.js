@@ -84,6 +84,95 @@ async function createDirectConversation(req, res) {
 }
 
 /**
+ * Create a new group conversation
+ * POST /api/conversations/group
+ *
+ * Request body:
+ * {
+ *   participantIds: string[],  // Array of user UUIDs (min 3 including creator)
+ *   name?: string,             // Optional group name (auto-generated if not provided)
+ *   avatarUrl?: string         // Optional avatar URL
+ * }
+ */
+async function createGroupConversation(req, res) {
+  try {
+    const { participantIds, name, avatarUrl } = req.body;
+    const creatorId = req.user.userId;
+
+    // 1. Verify creator is included in participantIds
+    if (!participantIds.includes(creatorId)) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Creator must be included in participantIds',
+      });
+    }
+
+    // 2. Verify all participants exist in database (batch query)
+    const participantResults = await User.findByIds(participantIds);
+    const foundUserIds = participantResults.map(u => u.id);
+
+    // Check if any participant IDs were not found
+    const notFoundIds = participantIds.filter(id => !foundUserIds.includes(id));
+    if (notFoundIds.length > 0) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: `User(s) not found: ${notFoundIds.join(', ')}`,
+      });
+    }
+
+    // 3. Create group conversation
+    const { conversation } = await Conversation.createGroup(creatorId, participantIds, {
+      name,
+      avatarUrl,
+    });
+
+    // 4. Fetch full conversation details with participants
+    const fullConversation = await Conversation.findById(conversation.id);
+
+    // 5. Enrich participants with online status (batch lookup)
+    if (fullConversation.participants && fullConversation.participants.length > 0) {
+      const allParticipantIds = fullConversation.participants.map(p => p.userId);
+      const presenceMap = await getBulkPresence(allParticipantIds);
+
+      fullConversation.participants.forEach(participant => {
+        participant.status = presenceMap[participant.userId]?.status || 'offline';
+      });
+    }
+
+    logger.info('Group conversation created', {
+      conversationId: conversation.id,
+      creatorId,
+      participantCount: participantIds.length,
+      name: conversation.name,
+    });
+
+    return res.status(201).json({
+      conversation: fullConversation,
+      created: true,
+    });
+  } catch (error) {
+    logger.error('Error in createGroupConversation', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.userId,
+      participantIds: req.body?.participantIds,
+    });
+
+    const errorResponse = {
+      error: 'Internal Server Error',
+      message: 'Failed to create group conversation',
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = error.message;
+      errorResponse.code = error.code;
+    }
+
+    return res.status(500).json(errorResponse);
+  }
+}
+
+/**
  * Get all conversations for the authenticated user
  * GET /api/conversations?limit=20&offset=0&type=direct
  */
@@ -167,5 +256,6 @@ async function getUserConversations(req, res) {
 
 module.exports = {
   createDirectConversation,
+  createGroupConversation,
   getUserConversations,
 };
