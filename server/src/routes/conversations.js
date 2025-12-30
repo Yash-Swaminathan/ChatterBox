@@ -4,6 +4,7 @@ const conversationController = require('../controllers/conversationController');
 const { requireAuth } = require('../middleware/auth');
 const {
   validateCreateDirectConversation,
+  validateCreateGroupConversation,
   validateGetConversations,
 } = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
@@ -39,6 +40,15 @@ router.post(
   createConversationLimiter,
   validateCreateDirectConversation,
   conversationController.createDirectConversation
+);
+
+// POST /api/conversations/group - Create group conversation
+router.post(
+  '/group',
+  requireAuth,
+  createConversationLimiter, // Reuse existing rate limiter (60 req/min)
+  validateCreateGroupConversation,
+  conversationController.createGroupConversation
 );
 
 // GET /api/conversations - Get all conversations for user

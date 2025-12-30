@@ -1,5 +1,6 @@
 const { RegExpMatcher, englishDataset, englishRecommendedTransformers } = require('obscenity');
 const { isValidUUID, isInRange, isOneOf } = require('../utils/validators');
+const { MAX_GROUP_PARTICIPANTS, MIN_GROUP_PARTICIPANTS } = require('../utils/constants');
 
 // Initialize profanity matcher
 const matcher = new RegExpMatcher({
@@ -214,6 +215,91 @@ function validateCreateDirectConversation(req, res, next) {
   // Validate UUID format
   if (participantId && !isValidUUID(participantId)) {
     errors.push('participantId must be a valid UUID');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: errors[0],
+    });
+  }
+
+  next();
+}
+
+/**
+ * Validate create group conversation input
+ *
+ * Request body:
+ * {
+ *   participantIds: string[],  // Array of UUIDs (min 3 including creator)
+ *   name?: string,             // Optional group name (1-100 chars if provided)
+ *   avatarUrl?: string         // Optional avatar URL
+ * }
+ */
+function validateCreateGroupConversation(req, res, next) {
+  const { participantIds, name, avatarUrl } = req.body;
+  const errors = [];
+
+  // 1. Validate participantIds is provided
+  if (!participantIds) {
+    errors.push('participantIds is required');
+  }
+
+  // 2. Validate participantIds is an array
+  if (participantIds && !Array.isArray(participantIds)) {
+    errors.push('participantIds must be an array');
+  }
+
+  // 3. Validate minimum participants (from constants)
+  if (Array.isArray(participantIds) && participantIds.length < MIN_GROUP_PARTICIPANTS) {
+    errors.push(`Group must have at least ${MIN_GROUP_PARTICIPANTS} participants (including creator)`);
+  }
+
+  // 4. Validate maximum participants (from constants - prevent DoS attacks)
+  if (Array.isArray(participantIds) && participantIds.length > MAX_GROUP_PARTICIPANTS) {
+    errors.push(`Maximum ${MAX_GROUP_PARTICIPANTS} participants allowed`);
+  }
+
+  // 5. Validate each participant ID is a valid UUID
+  if (Array.isArray(participantIds)) {
+    const invalidIds = participantIds.filter(id => !isValidUUID(id));
+    if (invalidIds.length > 0) {
+      errors.push('All participantIds must be valid UUIDs');
+    }
+  }
+
+  // 6. Validate no duplicate participant IDs
+  if (Array.isArray(participantIds)) {
+    const uniqueIds = new Set(participantIds);
+    if (uniqueIds.size !== participantIds.length) {
+      errors.push('participantIds must not contain duplicates');
+    }
+  }
+
+  // 7. Validate group name (optional, but if provided must be 1-100 chars)
+  if (name !== undefined && name !== null) {
+    if (typeof name !== 'string') {
+      errors.push('name must be a string');
+    } else if (name.trim().length < 1) {
+      errors.push('name must not be empty if provided');
+    } else if (name.trim().length > 100) {
+      errors.push('name must not exceed 100 characters');
+    }
+  }
+
+  // 8. Validate avatarUrl (optional, but if provided must be valid URL format)
+  if (avatarUrl !== undefined && avatarUrl !== null) {
+    if (typeof avatarUrl !== 'string') {
+      errors.push('avatarUrl must be a string');
+    } else if (avatarUrl.trim().length > 0) {
+      // Basic URL validation
+      try {
+        new URL(avatarUrl);
+      } catch (e) {
+        errors.push('avatarUrl must be a valid URL');
+      }
+    }
   }
 
   if (errors.length > 0) {
@@ -624,6 +710,7 @@ module.exports = {
   validateProfileUpdate,
   validateStatusUpdate,
   validateCreateDirectConversation,
+  validateCreateGroupConversation,
   validateGetConversations,
   validateGetMessages,
   validateMessageEdit,

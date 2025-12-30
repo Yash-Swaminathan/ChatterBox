@@ -663,6 +663,54 @@ function isValidUUID(uuid) {
   return uuidRegex.test(uuid);
 }
 
+/**
+ * Find multiple users by their IDs (batch query)
+ * Efficiently validates participant existence in a single database call
+ *
+ * @param {string[]} userIds - Array of user UUIDs
+ * @returns {Promise<Object[]>} Array of user objects (id, username, email, display_name, avatar_url, status, last_seen)
+ *
+ * @example
+ * // Validate group participants
+ * const users = await findByIds(['user-1-uuid', 'user-2-uuid', 'user-3-uuid']);
+ * // Returns: [{ id: 'user-1-uuid', username: 'alice', ... }, ...]
+ *
+ * @example
+ * // Empty array handling
+ * const users = await findByIds([]);
+ * // Returns: []
+ */
+async function findByIds(userIds) {
+  // Handle edge cases
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    logger.debug('findByIds called with empty or invalid array', { userIds });
+    return [];
+  }
+
+  try {
+    const query = `
+      SELECT id, username, email, display_name, avatar_url, status, last_seen
+      FROM users
+      WHERE id = ANY($1::uuid[])
+    `;
+
+    const result = await pool.query(query, [userIds]);
+
+    logger.debug('Users found by IDs', {
+      requestedCount: userIds.length,
+      foundCount: result.rows.length,
+    });
+
+    return result.rows;
+  } catch (error) {
+    logger.error('Error in findByIds', {
+      error: error.message,
+      userIds,
+    });
+    throw error;
+  }
+}
+
 module.exports = {
   getUserById,
   getPublicUserById,
@@ -677,5 +725,6 @@ module.exports = {
   getUserByUsername,
   getReadReceiptPrivacy,
   updateReadReceiptPrivacy,
+  findByIds,
   isValidUUID,
 };

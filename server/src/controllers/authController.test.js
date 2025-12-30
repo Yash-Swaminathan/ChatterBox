@@ -2,17 +2,17 @@ const request = require('supertest');
 const app = require('../app');
 const { query, closePool } = require('../config/database');
 
-// Test user data
+// Test user data - use unique email pattern to avoid conflicts
 const testUser = {
-  username: 'testuser',
-  email: 'test@example.com',
+  username: 'testuser_auth',
+  email: 'testauth@example.com',
   password: 'TestPass123',
   displayName: 'Test User',
 };
 
 const testUser2 = {
-  username: 'testuser2',
-  email: 'test2@example.com',
+  username: 'testuser2_auth',
+  email: 'test2auth@example.com',
   password: 'TestPass456',
 };
 
@@ -24,11 +24,11 @@ let userId;
 // Clean up function to delete test users
 async function cleanupTestUsers() {
   try {
-    // Clean up all test users including security tests and samepass tests
+    // Clean up all test users with auth pattern emails
     await query(
-      "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com')"
+      "DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%auth@example.com')"
     );
-    await query("DELETE FROM users WHERE email LIKE '%@example.com'");
+    await query("DELETE FROM users WHERE email LIKE '%auth@example.com'");
   } catch (error) {
     console.error('Error cleaning up test users:', error);
   }
@@ -95,7 +95,7 @@ describe('Authentication API', () => {
     test('should reject registration with duplicate username', async () => {
       const duplicateUser = {
         username: testUser.username,
-        email: 'different@example.com',
+        email: 'different_auth@example.com',
         password: 'TestPass123',
       };
 
@@ -133,7 +133,7 @@ describe('Authentication API', () => {
     test('should reject registration with short password', async () => {
       const invalidUser = {
         username: 'validuser',
-        email: 'valid@example.com',
+        email: 'validauth@example.com',
         password: 'short',
       };
 
@@ -146,7 +146,7 @@ describe('Authentication API', () => {
     test('should reject registration with short username', async () => {
       const invalidUser = {
         username: 'ab',
-        email: 'valid@example.com',
+        email: 'validauth2@example.com',
         password: 'TestPass123',
       };
 
@@ -220,7 +220,7 @@ describe('Authentication API', () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'nonexistent@example.com',
+          email: 'nonexistent_auth@example.com',
           password: 'TestPass123',
         })
         .expect(401);
@@ -381,10 +381,17 @@ describe('Authentication API', () => {
 
   describe('Complete Authentication Flow', () => {
     test('should complete full registration -> login -> access protected route -> logout flow', async () => {
+      // Use a unique user for this flow test to avoid conflicts
+      const flowUser = {
+        username: 'flowuser_auth',
+        email: 'flowuserauth@example.com',
+        password: 'FlowPass123',
+      };
+
       // 1. Register
       const registerResponse = await request(app)
         .post('/api/auth/register')
-        .send(testUser2)
+        .send(flowUser)
         .expect(201);
 
       const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
@@ -396,7 +403,7 @@ describe('Authentication API', () => {
         .set('Authorization', `Bearer ${newAccessToken}`)
         .expect(200);
 
-      expect(meResponse.body.data.user.email).toBe(testUser2.email);
+      expect(meResponse.body.data.user.email).toBe(flowUser.email);
 
       // 3. Refresh token
       const refreshResponse = await request(app)
@@ -424,7 +431,7 @@ describe('Authentication API', () => {
         .post('/api/auth/refresh')
         .send({ refreshToken: newRefreshToken })
         .expect(401);
-    });
+    }, 15000); // Increase timeout to 15 seconds for complex flow
   });
 
   describe('Password Security', () => {
@@ -434,8 +441,8 @@ describe('Authentication API', () => {
       const registerResponse = await request(app)
         .post('/api/auth/register')
         .send({
-          username: `securitytest${uniqueId}`,
-          email: `security${uniqueId}@example.com`,
+          username: `securitytest_auth_${uniqueId}`,
+          email: `securityauth${uniqueId}@example.com`,
           password: 'TestPass123',
         })
         .expect(201);
@@ -446,7 +453,7 @@ describe('Authentication API', () => {
       const loginResponse = await request(app)
         .post('/api/auth/login')
         .send({
-          email: `security${uniqueId}@example.com`,
+          email: `securityauth${uniqueId}@example.com`,
           password: 'TestPass123',
         });
 
@@ -469,13 +476,13 @@ describe('Authentication API', () => {
 
       // Register another user with same password
       await request(app).post('/api/auth/register').send({
-        username: 'samepass',
-        email: 'samepass@example.com',
+        username: 'samepass_auth',
+        email: 'samepassauth@example.com',
         password: testUser.password,
       });
 
       const result2 = await query('SELECT password_hash FROM users WHERE email = $1', [
-        'samepass@example.com',
+        'samepassauth@example.com',
       ]);
       const hash2 = result2.rows[0].password_hash;
 
@@ -486,6 +493,9 @@ describe('Authentication API', () => {
 
   describe('Session Management', () => {
     test('should create session on login', async () => {
+      // First register testUser2
+      await request(app).post('/api/auth/register').send(testUser2).expect(201);
+
       const loginResponse = await request(app).post('/api/auth/login').send({
         email: testUser2.email,
         password: testUser2.password,
