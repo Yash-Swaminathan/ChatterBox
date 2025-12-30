@@ -14,6 +14,8 @@ const app = require('../../app');
 const { generateAccessToken } = require('../../utils/jwt');
 const Conversation = require('../../models/Conversation');
 const { getBulkPresence } = require('../../services/presenceService');
+const { pool } = require('../../config/database');
+const { closeRedis } = require('../../config/redis');
 
 describe('GET /api/conversations/:conversationId/participants', () => {
   let authToken;
@@ -28,6 +30,13 @@ describe('GET /api/conversations/:conversationId/participants', () => {
       username: 'testuser',
       email: 'test@example.com',
     });
+  });
+
+  afterAll(async () => {
+    // Close database connections to prevent Jest warning
+    await pool.end();
+    // Close Redis connection
+    await closeRedis();
   });
 
   beforeEach(() => {
@@ -500,9 +509,13 @@ describe('GET /api/conversations/:conversationId/participants', () => {
       const response = await request(app)
         .get(`/api/conversations/${conversationId}/participants`)
         .set('Authorization', `Bearer ${authToken}`)
-        .expect(500);
+        .expect(200);
 
-      expect(response.body.error).toBe('Internal Server Error');
+      // Should still return participants with default offline status
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.participants).toHaveLength(1);
+      expect(response.body.data.participants[0].presenceStatus).toBe('offline');
+      expect(response.body.data.participants[0].lastSeen).toBeNull();
     });
   });
 
