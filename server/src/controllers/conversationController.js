@@ -353,7 +353,17 @@ async function getGroupParticipants(req, res) {
 
     // 4. Enrich with presence status (batch lookup to avoid N+1 queries)
     const userIds = participants.map(p => p.user_id);
-    const presenceMap = await getBulkPresence(userIds);
+    let presenceMap = {};
+    try {
+      presenceMap = await getBulkPresence(userIds);
+    } catch (error) {
+      logger.warn('Presence service unavailable, defaulting all users to offline', {
+        error: error.message,
+        conversationId,
+        participantCount: userIds.length,
+      });
+      // presenceMap remains empty object, all users default to offline
+    }
 
     // 5. Transform to response format
     const enrichedParticipants = participants.map(p => ({
