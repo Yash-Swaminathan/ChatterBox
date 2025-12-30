@@ -1,5 +1,6 @@
 const { RegExpMatcher, englishDataset, englishRecommendedTransformers } = require('obscenity');
 const { isValidUUID, isInRange, isOneOf } = require('../utils/validators');
+const { MAX_GROUP_PARTICIPANTS, MIN_GROUP_PARTICIPANTS } = require('../utils/constants');
 
 // Initialize profanity matcher
 const matcher = new RegExpMatcher({
@@ -250,14 +251,14 @@ function validateCreateGroupConversation(req, res, next) {
     errors.push('participantIds must be an array');
   }
 
-  // 3. Validate minimum participants (3)
-  if (Array.isArray(participantIds) && participantIds.length < 3) {
-    errors.push('Group must have at least 3 participants (including creator)');
+  // 3. Validate minimum participants (from constants)
+  if (Array.isArray(participantIds) && participantIds.length < MIN_GROUP_PARTICIPANTS) {
+    errors.push(`Group must have at least ${MIN_GROUP_PARTICIPANTS} participants (including creator)`);
   }
 
-  // 4. Validate maximum participants (100 - prevent abuse)
-  if (Array.isArray(participantIds) && participantIds.length > 100) {
-    errors.push('Group cannot have more than 100 participants');
+  // 4. Validate maximum participants (from constants - prevent DoS attacks)
+  if (Array.isArray(participantIds) && participantIds.length > MAX_GROUP_PARTICIPANTS) {
+    errors.push(`Maximum ${MAX_GROUP_PARTICIPANTS} participants allowed`);
   }
 
   // 5. Validate each participant ID is a valid UUID

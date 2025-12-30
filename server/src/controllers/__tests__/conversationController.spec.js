@@ -658,18 +658,55 @@ describe('Conversation Controller Integration Tests', () => {
       });
     });
 
-    it('should reject if creator not in participantIds', async () => {
+    it('should auto-include creator if not in participantIds', async () => {
       const user4Id = '550e8400-e29b-41d4-a716-446655440013';
       const participantIds = [user2Id, user3Id, user4Id]; // Missing creator (but has 3 participants)
+
+      // Mock User.findByIds to include all participants + creator
+      User.findByIds.mockResolvedValue([
+        { id: creatorId, username: 'creator' },
+        { id: user2Id, username: 'user2' },
+        { id: user3Id, username: 'user3' },
+        { id: user4Id, username: 'user4' },
+      ]);
+
+      Conversation.createGroup.mockResolvedValue({
+        conversation: {
+          id: 'group-auto-123',
+          type: 'group',
+          name: 'Auto Group',
+          created_by: creatorId,
+        },
+        created: true,
+      });
+
+      Conversation.findById.mockResolvedValue({
+        id: 'group-auto-123',
+        type: 'group',
+        name: 'Auto Group',
+        created_by: creatorId,
+        participants: [
+          { userId: creatorId, username: 'creator', role: 'admin' },
+          { userId: user2Id, username: 'user2', role: 'member' },
+          { userId: user3Id, username: 'user3', role: 'member' },
+          { userId: user4Id, username: 'user4', role: 'member' },
+        ],
+      });
 
       const response = await request(app)
         .post('/api/conversations/group')
         .set('Authorization', `Bearer ${creatorToken}`)
         .send({ participantIds })
-        .expect(400);
+        .expect(201);
 
-      expect(response.body.error).toBe('Validation Error');
-      expect(response.body.message).toContain('Creator must be included');
+      // Creator should be auto-included, making it 4 participants total
+      expect(response.body.conversation).toBeDefined();
+      expect(response.body.conversation.participants).toHaveLength(4);
+      expect(Conversation.createGroup).toHaveBeenCalledWith(
+        creatorId,
+        expect.arrayContaining([creatorId, user2Id, user3Id, user4Id]),
+        { name: undefined, avatarUrl: undefined }
+      );
     });
 
     it('should reject if less than 3 participants', async () => {
@@ -726,7 +763,7 @@ describe('Conversation Controller Integration Tests', () => {
         .expect(400);
 
       expect(response.body.error).toBe('Validation Error');
-      expect(response.body.message).toContain('cannot have more than 100 participants');
+      expect(response.body.message).toContain('Maximum 100 participants allowed');
     });
 
     it('should reject if name is empty string', async () => {

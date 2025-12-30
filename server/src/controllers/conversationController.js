@@ -99,20 +99,29 @@ async function createGroupConversation(req, res) {
     const { participantIds, name, avatarUrl } = req.body;
     const creatorId = req.user.userId;
 
-    // 1. Verify creator is included in participantIds
-    if (!participantIds.includes(creatorId)) {
+    // 1. Auto-include creator if not in participant list (better UX)
+    const uniqueParticipants = new Set(participantIds);
+    if (!uniqueParticipants.has(creatorId)) {
+      uniqueParticipants.add(creatorId);
+      logger.info('Auto-added creator to participant list', { creatorId });
+    }
+
+    const finalParticipantIds = Array.from(uniqueParticipants);
+
+    // 2. Validate minimum participants (3 including creator)
+    if (finalParticipantIds.length < 3) {
       return res.status(400).json({
         error: 'Validation Error',
-        message: 'Creator must be included in participantIds',
+        message: 'Group conversations require at least 3 participants (including you)',
       });
     }
 
-    // 2. Verify all participants exist in database (batch query)
-    const participantResults = await User.findByIds(participantIds);
+    // 3. Verify all participants exist in database (batch query)
+    const participantResults = await User.findByIds(finalParticipantIds);
     const foundUserIds = participantResults.map(u => u.id);
 
     // Check if any participant IDs were not found
-    const notFoundIds = participantIds.filter(id => !foundUserIds.includes(id));
+    const notFoundIds = finalParticipantIds.filter(id => !foundUserIds.includes(id));
     if (notFoundIds.length > 0) {
       return res.status(404).json({
         error: 'Not Found',
@@ -120,8 +129,8 @@ async function createGroupConversation(req, res) {
       });
     }
 
-    // 3. Create group conversation
-    const { conversation } = await Conversation.createGroup(creatorId, participantIds, {
+    // 4. Create group conversation
+    const { conversation } = await Conversation.createGroup(creatorId, finalParticipantIds, {
       name,
       avatarUrl,
     });
@@ -142,7 +151,7 @@ async function createGroupConversation(req, res) {
     logger.info('Group conversation created', {
       conversationId: conversation.id,
       creatorId,
-      participantCount: participantIds.length,
+      participantCount: finalParticipantIds.length,
       name: conversation.name,
     });
 

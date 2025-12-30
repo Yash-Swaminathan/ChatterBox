@@ -160,23 +160,29 @@ class Conversation {
       // Auto-generate group name if not provided
       let finalGroupName = name;
       if (!finalGroupName) {
-        // Fetch participant usernames for auto-generated name
+        // Fetch participant usernames for auto-generated name (batch query - optimized)
         const participantResult = await client.query(
           'SELECT username FROM users WHERE id = ANY($1::uuid[]) ORDER BY username LIMIT 3',
           [participantIds]
         );
 
         const usernames = participantResult.rows.map(row => row.username);
+        const totalParticipants = participantIds.length;
 
-        if (usernames.length <= 2) {
+        if (totalParticipants <= 3) {
+          // "Alice, Bob, and Charlie" for 3 participants
           finalGroupName = usernames.join(', ');
         } else {
-          // "Alice, Bob, Carol" or "Alice, Bob, and 2 others"
-          finalGroupName =
-            usernames.slice(0, 2).join(', ') +
-            (usernames.length > 2
-              ? `, and ${usernames.length - 2} other${usernames.length > 3 ? 's' : ''}`
-              : '');
+          // "Alice, Bob, and 2 others" for 5+ participants
+          const firstTwo = usernames.slice(0, 2).join(', ');
+          const remaining = totalParticipants - 2;
+          finalGroupName = `${firstTwo}, and ${remaining} ${remaining === 1 ? 'other' : 'others'}`;
+        }
+
+        // Truncate if name exceeds database limit (100 chars)
+        const MAX_GROUP_NAME_LENGTH = 100;
+        if (finalGroupName.length > MAX_GROUP_NAME_LENGTH) {
+          finalGroupName = finalGroupName.substring(0, MAX_GROUP_NAME_LENGTH - 3) + '...';
         }
       }
 
