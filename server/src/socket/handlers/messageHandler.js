@@ -11,6 +11,27 @@ const { checkRateLimit } = require('../../utils/rateLimiter');
 /**
  * Message Handler - Socket.io event handlers for real-time messaging
  * ============================================================================
+ * TODO (WEEK 17): ENHANCED MESSAGE MENTIONS
+ * ============================================================================
+ *
+ * Current State: Basic @username in content (no parsing or notifications)
+ * Future Enhancement: Parse mentions, store in database, send notifications
+ *
+ * Implementation Notes:
+ * - Create message_mentions table (message_id, mentioned_user_id)
+ * - Server-side mention parsing (extract @username from content)
+ * - Validate mentioned users are group participants
+ * - Socket.io event: mention:received to mentioned user
+ * - Frontend: Autocomplete dropdown when typing @
+ * - Mention highlighting (blue/accent color)
+ * - GET /api/messages/mentions endpoint (unread mentions)
+ * - Unread mention badge (separate from general unread count)
+ *
+ * Reference: WEEK7-8_SIMPLIFICATIONS.md
+ * Priority: Medium
+ * Estimated Effort: 2.5 hours
+ *
+ * ============================================================================
  * TODO (WEEK 17): PERFORMANCE & SCALING OPTIMIZATIONS
  * ============================================================================
  *

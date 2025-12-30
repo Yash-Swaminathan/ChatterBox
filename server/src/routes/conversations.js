@@ -6,6 +6,7 @@ const {
   validateCreateDirectConversation,
   validateCreateGroupConversation,
   validateGetConversations,
+  validateUUID,
 } = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
 
@@ -58,6 +59,15 @@ router.get(
   getConversationsLimiter,
   validateGetConversations,
   conversationController.getUserConversations
+);
+
+// GET /api/conversations/:conversationId/participants - Get conversation participants
+router.get(
+  '/:conversationId/participants',
+  requireAuth,
+  getConversationsLimiter, // Reuse existing rate limiter (120 req/min)
+  validateUUID('conversationId'),
+  conversationController.getGroupParticipants
 );
 
 module.exports = router;

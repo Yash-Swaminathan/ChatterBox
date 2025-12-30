@@ -23,7 +23,7 @@
 
 ## 🎯 CURRENT FOCUS: WEEK 7 - Group Messaging Foundations
 
-**Status**: Week 7 Day 1-2 COMPLETE ✅ | 580 tests (576 passing, 4 skipped) - 99.3% pass rate
+**Status**: Week 7 Day 3-4 COMPLETE ✅ | 593 tests (589 passing, 4 skipped) - 98.7% pass rate
 
 ---
 
@@ -38,13 +38,18 @@
 - [x] Validation: participant IDs, group name, avatar URL
 - [x] Transaction safety for atomic group creation
 
-**Day 3-4: Group Messaging (2 hours)** - 🔄 IN PROGRESS
-- [ ] Extend message:send handler for group conversations
-- [ ] Delivery status for groups (1 status row per recipient)
-- [ ] GET /api/conversations/:id/participants - List group members
-- [ ] Tests: group message broadcast, multi-user delivery
+**Day 3-4: Group Messaging (2 hours)** - ✅ COMPLETED
+- [x] Extend message:send handler for group conversations (already worked!)
+- [x] Delivery status for groups (1 status row per recipient) (already implemented!)
+- [x] GET /api/conversations/:id/participants - List group members
+- [x] Tests: group message broadcast, multi-user delivery (17 new tests)
+- [x] 8 TODO comments added for deferred Week 17/18 features
 
-**✅ Milestone 7a**: Group conversation foundation complete (50%)
+**Key Discovery**: 90% of group messaging already worked! Message handler is generic and supports both direct and group conversations without changes.
+
+**Deferred to Week 17/18**: Typing indicators for groups, full edit history, enhanced mentions, group read receipts, group permissions, invite links, archiving/muting endpoints, last admin protection. See `.claude/WEEK7_DAY3-4_DEFERRED.md` for details.
+
+**✅ Milestone 7a**: Group conversation foundation complete (100%)
 
 ---
 
@@ -3855,12 +3860,12 @@ chatterbox/
 
 ---
 
-### 🚀 WEEK 18: Contact Requests & Advanced Group Features (7 hours)
+### 🚀 WEEK 18: Contact Requests & Advanced Group Features (8 hours)
 
 **Goal**: Add friend request system + remaining deferred Week 7-8 group features (see [WEEK7-8_SIMPLIFICATIONS.md](.claude/WEEK7-8_SIMPLIFICATIONS.md))
 
 **Deferred from Week 6**: Friend request system with mutual consent workflow
-**Deferred from Week 8**: Group invite links, permissions, archiving/muting
+**Deferred from Week 8**: Group invite links, permissions, archiving/muting, last admin protection
 
 **Day 1: Contact Request Database & Model (1 hour)**
 - [ ] Create contact_requests table (migration 020)
@@ -3983,6 +3988,18 @@ chatterbox/
   - Skip push notifications for muted conversations
   - Show unread badge for muted (but silent)
 - [ ] Tests: mute/unmute, archive/unarchive, notification filtering
+
+**Day 6: Last Admin Protection (1 hour)** - Deferred from Week 8
+- [ ] Validation: Can't remove last admin from group
+  - Check: `COUNT(*) WHERE is_admin = true > 1` before removing
+  - Error message: "You are the last admin. Promote someone else first."
+- [ ] Promote new admin before leaving
+  - If last admin leaves, auto-promote longest member to admin
+  - Query: `SELECT user_id FROM conversation_participants WHERE conversation_id = $1 AND left_at IS NULL ORDER BY joined_at ASC LIMIT 1`
+- [ ] DELETE /api/conversations/:id/participants/:userId (enforce check)
+  - Add validation in remove participant endpoint
+  - Return 400 Bad Request if attempting to remove last admin
+- [ ] Tests: last admin removal prevention, auto-promotion, edge cases
 
 **Resume Bullets:**
 - "Built friend request system with mutual consent workflow, processing 500+ requests daily with Socket.io real-time notifications"

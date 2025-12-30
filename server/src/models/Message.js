@@ -1,6 +1,30 @@
 const { pool } = require('../config/database');
 const logger = require('../utils/logger');
 
+/**
+ * TODO (Week 17): Full Edit History Tracking
+ *
+ * Current State: Only tracking edited_at timestamp (simple version)
+ * Future: Store previous_content in message_edit_history table for full audit trail
+ *
+ * Implementation Notes:
+ * - Create message_edit_history table:
+ *   CREATE TABLE message_edit_history (
+ *     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ *     message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+ *     previous_content TEXT NOT NULL,
+ *     edited_by UUID NOT NULL REFERENCES users(id),
+ *     edited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ *   );
+ * - Store previous content before each edit in Message.update()
+ * - GET /api/messages/:id/history endpoint to retrieve edit history
+ * - Diff view UI (highlight changed text)
+ * - Rollback capability (restore previous version)
+ *
+ * Reference: WEEK7-8_SIMPLIFICATIONS.md
+ * Priority: Medium
+ * Estimated Effort: 2.5 hours
+ */
 class Message {
   static MAX_CONTENT_LENGTH = 10000;
   static EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
