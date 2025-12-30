@@ -7,6 +7,27 @@ const { checkRateLimit } = require('../utils/rateLimiter');
 /**
  * Message Controller - REST API for message retrieval and status management
  *
+ * TODO (Week 17): Group Read Receipt Aggregation UI
+ * Current State: Individual read status tracking works
+ * Future Enhancement: Aggregate "Read by 5 people" display in UI
+ *
+ * Implementation Notes:
+ * - GET /api/messages/:id/read-by endpoint
+ *   Return list of users who read the message
+ *   Group by read/unread status
+ * - Frontend: "Read by Alice, Bob, and 3 others" display
+ *   Click to expand full list with timestamps
+ *   Show avatars of readers
+ * - Optimize for large groups (100+ participants)
+ *   Only show top 5 readers + count
+ *   Lazy load full list on demand
+ * - Socket.io: Aggregate read receipts
+ *   Emit once with array of user IDs (not N individual events)
+ *
+ * Reference: WEEK7-8_SIMPLIFICATIONS.md
+ * Priority: Medium
+ * Estimated Effort: 1.5 hours
+ *
  * TODO: Future Improvements (from Code Review)
  * - Cache participant lists in Redis to reduce N+1 queries (line 24)
  * - Add Redis counter for unread counts instead of DB queries (line 164)
