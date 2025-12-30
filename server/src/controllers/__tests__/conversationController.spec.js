@@ -201,14 +201,20 @@ describe('Conversation Controller Integration Tests', () => {
 
       getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'online' } });
 
-      for (let i = 0; i < 65; i++) {
-        const response = await request(app)
+      // Make requests in parallel for faster test execution
+      const requests = Array.from({ length: 65 }, () =>
+        request(app)
           .post('/api/conversations/direct')
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ participantId: otherUserId });
+          .send({ participantId: otherUserId })
+      );
 
+      const responses = await Promise.all(requests);
+
+      // Verify all requests succeeded (rate limiting bypassed in test env)
+      responses.forEach(response => {
         expect(response.status).not.toBe(429);
-      }
+      });
     }, 30000);
   });
 

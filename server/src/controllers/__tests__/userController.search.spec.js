@@ -373,17 +373,23 @@ describe('User Controller - Search', () => {
         // Test that "True", "TRUE", "False", "FALSE" are NOT accepted
         const testCases = ['True', 'TRUE', 'False', 'FALSE', '1', '0', 'yes', 'no'];
 
-        for (const value of testCases) {
-          const response = await request(app)
-            .get(`/api/users/search?q=user&excludeContacts=${value}`)
-            .set('Authorization', `Bearer ${authToken}`);
+        // Test all cases sequentially with Promise.all for performance
+        const responses = await Promise.all(
+          testCases.map(value =>
+            request(app)
+              .get(`/api/users/search?q=user&excludeContacts=${value}`)
+              .set('Authorization', `Bearer ${authToken}`)
+          )
+        );
 
+        // Verify all responses returned 400 with correct error
+        responses.forEach((response) => {
           expect(response.status).toBe(400);
           expect(response.body.success).toBe(false);
           expect(response.body.error.code).toBe('VALIDATION_ERROR');
           expect(response.body.error.message).toBe('excludeContacts must be true or false');
-        }
-      });
+        });
+      }, 10000); // 10 second timeout for multiple requests
 
       it('should not affect results when user is not authenticated (edge case)', async () => {
         // This should never happen due to requireAuth middleware, but test defensive coding
