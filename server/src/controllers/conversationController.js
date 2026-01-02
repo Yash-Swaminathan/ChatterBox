@@ -1,5 +1,6 @@
 const Conversation = require('../models/Conversation');
 const User = require('../models/User');
+const { pool } = require('../config/database');
 const { getBulkPresence } = require('../services/presenceService');
 const logger = require('../utils/logger');
 
@@ -412,9 +413,231 @@ async function getGroupParticipants(req, res) {
   }
 }
 
+/**
+ * Add participants to a group conversation (admin-only)
+ * POST /api/conversations/:conversationId/participants
+ * Body: { userIds: ['uuid1', 'uuid2', ...] }
+ */
+async function addParticipants(req, res) {
+  try {
+    const { conversationId } = req.params;
+    const { userIds } = req.body;
+    const requesterId = req.user.userId;
+
+    // Verify conversation exists and is a group
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Conversation not found',
+      });
+    }
+
+    if (conversation.type !== 'group') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Can only add participants to group conversations',
+      });
+    }
+
+    // Check if all users exist
+    const { rows: users } = await pool.query(
+      'SELECT id FROM users WHERE id = ANY($1)',
+      [userIds]
+    );
+
+    if (users.length !== userIds.length) {
+      const foundIds = users.map(u => u.id);
+      const notFoundIds = userIds.filter(id => !foundIds.includes(id));
+      return res.status(404).json({
+        error: 'Not Found',
+        message: `Users not found: ${notFoundIds.join(', ')}`,
+      });
+    }
+
+    // Add participants (batch operation)
+    const addedParticipants = await Conversation.addParticipants(conversationId, userIds);
+
+    // Emit Socket.io event to conversation room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conversation:${conversationId}`).emit('conversation:participant-added', {
+        conversationId,
+        participants: addedParticipants,
+        addedBy: requesterId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    logger.info('Participants added to conversation', {
+      conversationId,
+      addedBy: requesterId,
+      count: addedParticipants.length,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Participants added successfully',
+      data: {
+        participants: addedParticipants,
+        count: addedParticipants.length,
+      },
+    });
+  } catch (error) {
+    logger.error('Error adding participants:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to add participants',
+    });
+  }
+}
+
+/**
+ * Remove a participant from a group conversation
+ * DELETE /api/conversations/:conversationId/participants/:userId
+ * Authorization: Admin OR self-removal
+ */
+async function removeParticipant(req, res) {
+  try {
+    const { conversationId, userId } = req.params;
+    const requesterId = req.user.userId;
+
+    // Verify conversation exists and is a group
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Conversation not found',
+      });
+    }
+
+    if (conversation.type !== 'group') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Can only remove participants from group conversations',
+      });
+    }
+
+    // Verify target user is an active participant
+    const isTargetParticipant = await Conversation.isParticipant(conversationId, userId);
+    if (!isTargetParticipant) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'User is not a participant in this conversation',
+      });
+    }
+
+    // Authorization check: Must be admin OR removing self
+    const isRequesterAdmin = await Conversation.isAdmin(conversationId, requesterId);
+    const isSelfRemoval = requesterId === userId;
+
+    if (!isRequesterAdmin && !isSelfRemoval) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only admins can remove other participants',
+      });
+    }
+
+    // Last admin protection
+    const isTargetAdmin = await Conversation.isAdmin(conversationId, userId);
+    if (isTargetAdmin) {
+      const adminCount = await Conversation.getAdminCount(conversationId);
+
+      if (adminCount === 1) {
+        // This is the last admin - auto-promote oldest member
+        const oldestMemberId = await Conversation.getOldestMember(conversationId);
+
+        if (!oldestMemberId) {
+          // No other members to promote - this is the last participant
+          return res.status(400).json({
+            error: 'Bad Request',
+            message: 'Cannot remove the last participant from a group',
+          });
+        }
+
+        // Promote oldest member to admin
+        await Conversation.promoteToAdmin(conversationId, oldestMemberId);
+
+        logger.info('Auto-promoted oldest member to admin', {
+          conversationId,
+          newAdminId: oldestMemberId,
+          removedAdminId: userId,
+        });
+
+        // Emit promotion event
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`conversation:${conversationId}`).emit('conversation:admin-promoted', {
+            conversationId,
+            userId: oldestMemberId,
+            reason: 'last_admin_leaving',
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // Check if this would leave the group empty
+    const activeCount = await Conversation.getActiveParticipantCount(conversationId);
+    if (activeCount === 1) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Cannot remove the last participant from a group',
+      });
+    }
+
+    // Remove participant (soft delete)
+    const removed = await Conversation.removeParticipant(conversationId, userId);
+
+    if (!removed) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Participant not found or already removed',
+      });
+    }
+
+    // Emit Socket.io event to conversation room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conversation:${conversationId}`).emit('conversation:participant-removed', {
+        conversationId,
+        userId,
+        removedBy: requesterId,
+        leftAt: new Date().toISOString(),
+        isSelfRemoval,
+      });
+    }
+
+    logger.info('Participant removed from conversation', {
+      conversationId,
+      userId,
+      removedBy: requesterId,
+      isSelfRemoval,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: isSelfRemoval ? 'You have left the conversation' : 'Participant removed successfully',
+      data: {
+        conversationId,
+        userId,
+        leftAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('Error removing participant:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to remove participant',
+    });
+  }
+}
+
 module.exports = {
   createDirectConversation,
   createGroupConversation,
   getUserConversations,
   getGroupParticipants,
+  addParticipants,
+  removeParticipant,
 };
