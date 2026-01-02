@@ -1,4 +1,6 @@
 const { verifyAccessToken } = require('../utils/jwt');
+const Conversation = require('../models/Conversation');
+const logger = require('../utils/logger');
 
 /**
  * @typedef {import('../types/auth.types').DecodedToken} DecodedToken
@@ -52,6 +54,36 @@ function requireAuth(req, res, next) {
   }
 }
 
+/**
+ * Middleware to check if user is admin of a conversation
+ * Expects conversationId in req.params
+ * Expects userId in req.user (from requireAuth)
+ */
+async function requireAdmin(req, res, next) {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.userId;
+
+    const isAdmin = await Conversation.isAdmin(conversationId, userId);
+
+    if (!isAdmin) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only admins can perform this action',
+      });
+    }
+
+    next();
+  } catch (error) {
+    logger.error('Error checking admin status:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to verify admin permissions',
+    });
+  }
+}
+
 module.exports = {
   requireAuth,
+  requireAdmin,
 };

@@ -364,26 +364,29 @@ class Conversation {
   }
 
   /**
-   * Remove a participant from a conversation
+   * Remove a participant from a conversation (soft delete)
    *
    * @param {string} conversationId - Conversation UUID
    * @param {string} userId - User UUID to remove
-   * @returns {Promise<number>} Number of rows deleted (0 or 1)
+   * @returns {Promise<boolean>} True if participant was removed
    */
   static async removeParticipant(conversationId, userId) {
     const result = await pool.query(
-      `DELETE FROM conversation_participants
-       WHERE conversation_id = $1 AND user_id = $2`,
+      `UPDATE conversation_participants
+       SET left_at = NOW()
+       WHERE conversation_id = $1
+         AND user_id = $2
+         AND left_at IS NULL`,
       [conversationId, userId]
     );
 
-    logger.info('Participant removed', {
+    logger.info('Participant removed (soft delete)', {
       conversationId,
       userId,
       removed: result.rowCount > 0,
     });
 
-    return result.rowCount;
+    return result.rowCount > 0;
   }
 
   /**
@@ -450,11 +453,12 @@ class Conversation {
    */
   static async getParticipants(conversationId) {
     const result = await pool.query(
-      `SELECT cp.user_id, cp.joined_at, cp.is_admin,
+      `SELECT cp.user_id, cp.is_admin, cp.joined_at, cp.last_read_at,
               u.username, u.display_name, u.avatar_url
        FROM conversation_participants cp
        JOIN users u ON cp.user_id = u.id
-       WHERE cp.conversation_id = $1`,
+       WHERE cp.conversation_id = $1 AND cp.left_at IS NULL
+       ORDER BY cp.joined_at ASC`,
       [conversationId]
     );
 
@@ -492,6 +496,161 @@ class Conversation {
     });
 
     return result.rowCount > 0;
+  }
+
+  /**
+   * Check if user is an admin in the conversation
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @param {string} userId - User UUID
+   * @returns {Promise<boolean>} True if user is admin
+   */
+  static async isAdmin(conversationId, userId) {
+    const result = await pool.query(
+      `SELECT is_admin FROM conversation_participants
+       WHERE conversation_id = $1
+         AND user_id = $2
+         AND left_at IS NULL`,
+      [conversationId, userId]
+    );
+
+    return result.rows.length > 0 && result.rows[0].is_admin === true;
+  }
+
+  /**
+   * Get count of active admins in a conversation
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @returns {Promise<number>} Number of active admins
+   */
+  static async getAdminCount(conversationId) {
+    const result = await pool.query(
+      `SELECT COUNT(*) as count FROM conversation_participants
+       WHERE conversation_id = $1
+         AND is_admin = true
+         AND left_at IS NULL`,
+      [conversationId]
+    );
+
+    return parseInt(result.rows[0].count, 10);
+  }
+
+  /**
+   * Get the oldest non-admin member (for auto-promotion)
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @returns {Promise<string|null>} User ID of oldest member, or null if none
+   */
+  static async getOldestMember(conversationId) {
+    const result = await pool.query(
+      `SELECT user_id FROM conversation_participants
+       WHERE conversation_id = $1
+         AND is_admin = false
+         AND left_at IS NULL
+       ORDER BY joined_at ASC
+       LIMIT 1`,
+      [conversationId]
+    );
+
+    return result.rows.length > 0 ? result.rows[0].user_id : null;
+  }
+
+  /**
+   * Promote a user to admin
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @param {string} userId - User UUID to promote
+   * @returns {Promise<boolean>} True if promoted successfully
+   */
+  static async promoteToAdmin(conversationId, userId) {
+    const result = await pool.query(
+      `UPDATE conversation_participants
+       SET is_admin = true
+       WHERE conversation_id = $1
+         AND user_id = $2
+         AND left_at IS NULL`,
+      [conversationId, userId]
+    );
+
+    logger.info('User promoted to admin', {
+      conversationId,
+      userId,
+      promoted: result.rowCount > 0,
+    });
+
+    return result.rowCount > 0;
+  }
+
+  /**
+   * Add multiple participants to a conversation (batch operation)
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @param {string[]} userIds - Array of user UUIDs (max 10)
+   * @returns {Promise<object[]>} Array of added participants with user details
+   */
+  static async addParticipants(conversationId, userIds) {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Use unnest() for safe bulk insert (no dynamic SQL)
+      // This is safer than string interpolation and works with parameterized queries
+      const insertQuery = `
+        INSERT INTO conversation_participants
+          (conversation_id, user_id, is_admin, joined_at)
+        SELECT $1, unnest($2::uuid[]), false, NOW()
+        ON CONFLICT (conversation_id, user_id)
+        DO UPDATE SET left_at = NULL, joined_at = NOW()
+        RETURNING user_id
+      `;
+
+      const insertResult = await client.query(insertQuery, [conversationId, userIds]);
+      const addedUserIds = insertResult.rows.map(row => row.user_id);
+
+      // Fetch user details for added participants
+      const userDetailsQuery = `
+        SELECT id, username, display_name, avatar_url
+        FROM users
+        WHERE id = ANY($1)
+      `;
+      const userDetailsResult = await client.query(userDetailsQuery, [addedUserIds]);
+
+      await client.query('COMMIT');
+
+      logger.info('Participants added (batch)', {
+        conversationId,
+        count: userDetailsResult.rows.length,
+      });
+
+      return userDetailsResult.rows;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error adding participants (batch)', {
+        error: error.message,
+        conversationId,
+        userCount: userIds.length,
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get active participants count (for last participant check)
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @returns {Promise<number>} Number of active participants
+   */
+  static async getActiveParticipantCount(conversationId) {
+    const result = await pool.query(
+      `SELECT COUNT(*) as count FROM conversation_participants
+       WHERE conversation_id = $1 AND left_at IS NULL`,
+      [conversationId]
+    );
+
+    return parseInt(result.rows[0].count, 10);
   }
 }
 

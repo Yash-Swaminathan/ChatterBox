@@ -704,6 +704,62 @@ function validateUUID(paramName) {
   };
 }
 
+/**
+ * Validate add participants request body
+ * - userIds must be an array
+ * - Max 10 users per request
+ * - All userIds must be valid UUIDs
+ */
+function validateAddParticipants() {
+  return (req, res, next) => {
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds)) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'userIds must be an array',
+      });
+    }
+
+    if (userIds.length === 0) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'userIds array cannot be empty',
+      });
+    }
+
+    if (userIds.length > 10) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Cannot add more than 10 participants at once',
+      });
+    }
+
+    // Validate all UUIDs
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const invalidIds = userIds.filter(id => !uuidRegex.test(id));
+
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: `Invalid UUID format for userIds: ${invalidIds.join(', ')}`,
+      });
+    }
+
+    // Check for duplicates
+    const uniqueIds = new Set(userIds);
+    if (uniqueIds.size !== userIds.length) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Duplicate user IDs in request',
+      });
+    }
+
+    next();
+  };
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -721,4 +777,5 @@ module.exports = {
   validateGetContacts,
   validateUserSearch,
   validateUUID,
+  validateAddParticipants,
 };

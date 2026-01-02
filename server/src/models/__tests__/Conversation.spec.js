@@ -270,24 +270,28 @@ describe('Conversation Model', () => {
   });
 
   describe('removeParticipant', () => {
-    it('should remove participant from conversation', async () => {
+    it('should remove participant from conversation (soft delete)', async () => {
       pool.query = jest.fn().mockResolvedValue({ rowCount: 1 });
 
       const result = await Conversation.removeParticipant('conv-123', 'user-2');
 
-      expect(result).toBe(1);
+      expect(result).toBe(true);
       expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM conversation_participants'),
+        expect.stringContaining('UPDATE conversation_participants'),
+        ['conv-123', 'user-2']
+      );
+      expect(pool.query).toHaveBeenCalledWith(
+        expect.stringContaining('SET left_at = NOW()'),
         ['conv-123', 'user-2']
       );
     });
 
-    it('should return 0 if participant not found', async () => {
+    it('should return false if participant not found', async () => {
       pool.query = jest.fn().mockResolvedValue({ rowCount: 0 });
 
       const result = await Conversation.removeParticipant('conv-123', 'user-999');
 
-      expect(result).toBe(0);
+      expect(result).toBe(false);
     });
   });
 

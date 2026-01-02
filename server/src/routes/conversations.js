@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const conversationController = require('../controllers/conversationController');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const {
   validateCreateDirectConversation,
   validateCreateGroupConversation,
   validateGetConversations,
   validateUUID,
+  validateAddParticipants,
 } = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
 
@@ -68,6 +69,34 @@ router.get(
   getConversationsLimiter, // Reuse existing rate limiter (120 req/min)
   validateUUID('conversationId'),
   conversationController.getGroupParticipants
+);
+
+/**
+ * Add participants to a group conversation (admin-only)
+ * POST /api/conversations/:conversationId/participants
+ */
+router.post(
+  '/:conversationId/participants',
+  requireAuth,
+  validateUUID('conversationId'),
+  requireAdmin, // Must be admin to add participants
+  validateAddParticipants(),
+  createConversationLimiter, // Reuse existing limiter (60 req/min)
+  conversationController.addParticipants
+);
+
+/**
+ * Remove a participant from a group conversation
+ * DELETE /api/conversations/:conversationId/participants/:userId
+ * Authorization: Admin OR self-removal
+ */
+router.delete(
+  '/:conversationId/participants/:userId',
+  requireAuth,
+  validateUUID('conversationId'),
+  validateUUID('userId'),
+  createConversationLimiter, // Reuse existing limiter (60 req/min)
+  conversationController.removeParticipant
 );
 
 module.exports = router;
