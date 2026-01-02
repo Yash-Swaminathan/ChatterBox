@@ -594,26 +594,18 @@ class Conversation {
     try {
       await client.query('BEGIN');
 
-      // Build VALUES clause for bulk insert
-      const values = [];
-      const params = [conversationId];
-      userIds.forEach((userId, index) => {
-        const paramIndex = index + 2;
-        values.push(`($1, $${paramIndex}, false, NOW())`);
-        params.push(userId);
-      });
-
-      // Insert participants (ON CONFLICT handles re-adding removed users)
+      // Use unnest() for safe bulk insert (no dynamic SQL)
+      // This is safer than string interpolation and works with parameterized queries
       const insertQuery = `
         INSERT INTO conversation_participants
           (conversation_id, user_id, is_admin, joined_at)
-        VALUES ${values.join(', ')}
+        SELECT $1, unnest($2::uuid[]), false, NOW()
         ON CONFLICT (conversation_id, user_id)
         DO UPDATE SET left_at = NULL, joined_at = NOW()
         RETURNING user_id
       `;
 
-      const insertResult = await client.query(insertQuery, params);
+      const insertResult = await client.query(insertQuery, [conversationId, userIds]);
       const addedUserIds = insertResult.rows.map(row => row.user_id);
 
       // Fetch user details for added participants

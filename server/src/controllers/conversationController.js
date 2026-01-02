@@ -496,15 +496,22 @@ async function addParticipants(req, res) {
  * Remove a participant from a group conversation
  * DELETE /api/conversations/:conversationId/participants/:userId
  * Authorization: Admin OR self-removal
+ *
+ * IMPORTANT: Uses database transaction with row-level locking to prevent race conditions
  */
 async function removeParticipant(req, res) {
+  const client = await pool.connect();
+
   try {
     const { conversationId, userId } = req.params;
     const requesterId = req.user.userId;
 
+    await client.query('BEGIN');
+
     // Verify conversation exists and is a group
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         error: 'Not Found',
         message: 'Conversation not found',
@@ -512,93 +519,149 @@ async function removeParticipant(req, res) {
     }
 
     if (conversation.type !== 'group') {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Can only remove participants from group conversations',
+        message: 'This action is only available for group conversations',
       });
     }
 
+    // Lock conversation participants rows to prevent concurrent modifications
+    // Get participant data with row-level lock (FOR UPDATE)
+    const participantDataQuery = `
+      SELECT
+        user_id,
+        is_admin,
+        COUNT(*) FILTER (WHERE left_at IS NULL) OVER () as active_count,
+        COUNT(*) FILTER (WHERE left_at IS NULL AND is_admin = true) OVER () as admin_count
+      FROM conversation_participants
+      WHERE conversation_id = $1
+        AND user_id IN ($2, $3)
+        AND left_at IS NULL
+      FOR UPDATE
+    `;
+    const { rows: participantData } = await client.query(participantDataQuery, [
+      conversationId,
+      userId,
+      requesterId,
+    ]);
+
+    // Find target and requester in results
+    const targetData = participantData.find(p => p.user_id === userId);
+    const requesterData = participantData.find(p => p.user_id === requesterId);
+
     // Verify target user is an active participant
-    const isTargetParticipant = await Conversation.isParticipant(conversationId, userId);
-    if (!isTargetParticipant) {
+    if (!targetData) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         error: 'Not Found',
         message: 'User is not a participant in this conversation',
       });
     }
 
-    // Authorization check: Must be admin OR removing self
-    const isRequesterAdmin = await Conversation.isAdmin(conversationId, requesterId);
-    const isSelfRemoval = requesterId === userId;
+    const activeCount = parseInt(targetData.active_count, 10);
+    const adminCount = parseInt(targetData.admin_count, 10);
 
-    if (!isRequesterAdmin && !isSelfRemoval) {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Only admins can remove other participants',
-      });
-    }
-
-    // Last admin protection
-    const isTargetAdmin = await Conversation.isAdmin(conversationId, userId);
-    if (isTargetAdmin) {
-      const adminCount = await Conversation.getAdminCount(conversationId);
-
-      if (adminCount === 1) {
-        // This is the last admin - auto-promote oldest member
-        const oldestMemberId = await Conversation.getOldestMember(conversationId);
-
-        if (!oldestMemberId) {
-          // No other members to promote - this is the last participant
-          return res.status(400).json({
-            error: 'Bad Request',
-            message: 'Cannot remove the last participant from a group',
-          });
-        }
-
-        // Promote oldest member to admin
-        await Conversation.promoteToAdmin(conversationId, oldestMemberId);
-
-        logger.info('Auto-promoted oldest member to admin', {
-          conversationId,
-          newAdminId: oldestMemberId,
-          removedAdminId: userId,
-        });
-
-        // Emit promotion event
-        const io = req.app.get('io');
-        if (io) {
-          io.to(`conversation:${conversationId}`).emit('conversation:admin-promoted', {
-            conversationId,
-            userId: oldestMemberId,
-            reason: 'last_admin_leaving',
-            timestamp: new Date().toISOString(),
-          });
-        }
-      }
-    }
-
-    // Check if this would leave the group empty
-    const activeCount = await Conversation.getActiveParticipantCount(conversationId);
+    // CRITICAL: Check if this would leave the group empty (do this first!)
     if (activeCount === 1) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Cannot remove the last participant from a group',
       });
     }
 
-    // Remove participant (soft delete)
-    const removed = await Conversation.removeParticipant(conversationId, userId);
+    // Authorization check: Must be admin OR removing self
+    const isRequesterAdmin = requesterData && requesterData.is_admin === true;
+    const isSelfRemoval = requesterId === userId;
 
-    if (!removed) {
+    if (!isRequesterAdmin && !isSelfRemoval) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only admins can remove other participants',
+      });
+    }
+
+    // Last admin protection (inside transaction, race-condition safe)
+    const isTargetAdmin = targetData.is_admin === true;
+    let promotedUserId = null;
+
+    if (isTargetAdmin && adminCount === 1) {
+      // This is the last admin - auto-promote oldest member
+      const oldestMemberQuery = `
+        SELECT user_id FROM conversation_participants
+        WHERE conversation_id = $1
+          AND is_admin = false
+          AND left_at IS NULL
+        ORDER BY joined_at ASC
+        LIMIT 1
+      `;
+      const { rows: oldestMembers } = await client.query(oldestMemberQuery, [
+        conversationId,
+      ]);
+
+      if (oldestMembers.length === 0) {
+        // No other members to promote - this shouldn't happen due to activeCount check
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Cannot remove the last participant from a group',
+        });
+      }
+
+      promotedUserId = oldestMembers[0].user_id;
+
+      // Promote oldest member to admin (inside same transaction)
+      await client.query(
+        `UPDATE conversation_participants
+         SET is_admin = true
+         WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL`,
+        [conversationId, promotedUserId]
+      );
+
+      logger.info('Auto-promoted oldest member to admin', {
+        conversationId,
+        newAdminId: promotedUserId,
+        removedAdminId: userId,
+      });
+    }
+
+    // Remove participant (soft delete) - inside same transaction
+    const removeQuery = `
+      UPDATE conversation_participants
+      SET left_at = NOW()
+      WHERE conversation_id = $1
+        AND user_id = $2
+        AND left_at IS NULL
+    `;
+    const removeResult = await client.query(removeQuery, [conversationId, userId]);
+
+    if (removeResult.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         error: 'Not Found',
         message: 'Participant not found or already removed',
       });
     }
 
-    // Emit Socket.io event to conversation room
+    // Commit transaction - all operations succeeded
+    await client.query('COMMIT');
+
+    // Emit Socket.io events AFTER successful commit
     const io = req.app.get('io');
     if (io) {
+      // Emit admin promotion event if occurred
+      if (promotedUserId) {
+        io.to(`conversation:${conversationId}`).emit('conversation:admin-promoted', {
+          conversationId,
+          userId: promotedUserId,
+          reason: 'last_admin_leaving',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Emit participant removal event
       io.to(`conversation:${conversationId}`).emit('conversation:participant-removed', {
         conversationId,
         userId,
@@ -613,23 +676,30 @@ async function removeParticipant(req, res) {
       userId,
       removedBy: requesterId,
       isSelfRemoval,
+      adminPromoted: promotedUserId !== null,
     });
 
     return res.status(200).json({
       success: true,
-      message: isSelfRemoval ? 'You have left the conversation' : 'Participant removed successfully',
+      message: isSelfRemoval
+        ? 'You have left the conversation'
+        : 'Participant removed successfully',
       data: {
         conversationId,
         userId,
         leftAt: new Date().toISOString(),
+        adminPromoted: promotedUserId,
       },
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error('Error removing participant:', error);
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to remove participant',
     });
+  } finally {
+    client.release();
   }
 }
 
