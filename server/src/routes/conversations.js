@@ -8,6 +8,8 @@ const {
   validateGetConversations,
   validateUUID,
   validateAddParticipants,
+  validateGroupSettings,
+  validateRoleUpdate,
 } = require('../middleware/validation');
 const rateLimit = require('express-rate-limit');
 
@@ -97,6 +99,35 @@ router.delete(
   validateUUID('userId'),
   createConversationLimiter, // Reuse existing limiter (60 req/min)
   conversationController.removeParticipant
+);
+
+/**
+ * Update participant role (promote/demote admin)
+ * PUT /api/conversations/:conversationId/participants/:userId/role
+ * Authorization: Admin-only
+ */
+router.put(
+  '/:conversationId/participants/:userId/role',
+  requireAuth,
+  validateUUID('conversationId'),
+  validateUUID('userId'),
+  validateRoleUpdate,
+  createConversationLimiter, // Reuse existing limiter (60 req/min)
+  conversationController.updateParticipantRole
+);
+
+/**
+ * Update group settings (name, avatar)
+ * PUT /api/conversations/:conversationId
+ * Authorization: Admin-only
+ */
+router.put(
+  '/:conversationId',
+  requireAuth,
+  validateUUID('conversationId'),
+  validateGroupSettings,
+  createConversationLimiter, // Reuse existing limiter (60 req/min)
+  conversationController.updateGroupSettings
 );
 
 module.exports = router;
