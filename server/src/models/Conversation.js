@@ -652,6 +652,131 @@ class Conversation {
 
     return parseInt(result.rows[0].count, 10);
   }
+
+  /**
+   * Update group conversation metadata (name and/or avatar)
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @param {Object} updates - Updates object
+   * @param {string} [updates.name] - New group name (1-100 chars)
+   * @param {string} [updates.avatarUrl] - New avatar URL (or null to remove)
+   * @returns {Promise<Object>} Updated conversation
+   * @throws {Error} If no fields to update or conversation not found
+   *
+   * // TODO (Week 17): Add version tracking for group settings changes
+   * //   - Create conversation_settings_history table
+   * //   - Track who changed what and when
+   * //   - Useful for admin audit logs
+   *
+   * // TODO (Week 18): Add validation for avatar URL
+   * //   - Verify URL is accessible (HTTP HEAD request)
+   * //   - Check file size and dimensions
+   * //   - Support only image MIME types
+   *
+   * // TODO (Week 18): Add profanity filter for group names
+   * //   - Install bad-words or similar package
+   * //   - Reject names with offensive content
+   * //   - Return clear error message
+   */
+  static async updateGroupMetadata(conversationId, updates) {
+    const { name, avatarUrl } = updates;
+
+    // Build dynamic SET clause based on provided fields
+    const setClauses = [];
+    const values = [conversationId];
+    let valueIndex = 2;
+
+    if (name !== undefined) {
+      setClauses.push(`name = $${valueIndex}`);
+      values.push(name);
+      valueIndex++;
+    }
+
+    if (avatarUrl !== undefined) {
+      setClauses.push(`avatar_url = $${valueIndex}`);
+      values.push(avatarUrl);
+      valueIndex++;
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No fields to update');
+    }
+
+    // Add updated_at timestamp
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+
+    const query = `
+      UPDATE conversations
+      SET ${setClauses.join(', ')}
+      WHERE id = $1 AND type = 'group'
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      throw new Error('Group conversation not found');
+    }
+
+    logger.info('Group metadata updated', {
+      conversationId,
+      updates: Object.keys(updates),
+    });
+
+    return result.rows[0];
+  }
+
+  /**
+   * Update participant role (admin or member)
+   *
+   * @param {string} conversationId - Conversation UUID
+   * @param {string} userId - User UUID to update
+   * @param {boolean} isAdmin - True for admin, false for member
+   * @param {Object} [client] - Optional transaction client
+   * @returns {Promise<Object>} Updated participant
+   * @throws {Error} If participant not found or already left
+   *
+   * // TODO (Week 17): Add role change history tracking
+   * //   - Create participant_role_history table
+   * //   - Track: who changed role, when, from what to what
+   * //   - Display in group admin logs
+   *
+   * // TODO (Week 18): Add granular permissions
+   * //   - Instead of just admin/member, support custom roles
+   * //   - Create group_roles table (e.g., moderator, editor)
+   * //   - Each role has specific permissions
+   */
+  static async updateParticipantRole(conversationId, userId, isAdmin, client = null) {
+    const db = client || pool;
+
+    const query = `
+      UPDATE conversation_participants
+      SET is_admin = $3
+      WHERE conversation_id = $1
+        AND user_id = $2
+        AND left_at IS NULL
+      RETURNING
+        conversation_id,
+        user_id,
+        is_admin,
+        joined_at,
+        last_read_at
+    `;
+
+    const result = await db.query(query, [conversationId, userId, isAdmin]);
+
+    if (result.rows.length === 0) {
+      throw new Error('Participant not found or already left');
+    }
+
+    logger.info('Participant role updated', {
+      conversationId,
+      userId,
+      isAdmin,
+    });
+
+    return result.rows[0];
+  }
 }
 
 module.exports = Conversation;
