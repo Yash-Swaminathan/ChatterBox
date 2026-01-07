@@ -101,7 +101,8 @@ describe('Conversation Controller - Group Settings', () => {
         expect(response.body.data.conversation.name).toBe('Updated Group Name');
         expect(Conversation.updateGroupMetadata).toHaveBeenCalledWith(
           conversationId,
-          { name: 'Updated Group Name' }
+          { name: 'Updated Group Name' },
+          mockClient // Transaction client
         );
       });
 
@@ -134,7 +135,8 @@ describe('Conversation Controller - Group Settings', () => {
         expect(response.body.data.conversation.avatarUrl).toBe(avatarUrl);
         expect(Conversation.updateGroupMetadata).toHaveBeenCalledWith(
           conversationId,
-          { avatarUrl }
+          { avatarUrl },
+          mockClient // Transaction client
         );
       });
 
@@ -197,7 +199,8 @@ describe('Conversation Controller - Group Settings', () => {
         expect(response.body.data.conversation.avatarUrl).toBeNull();
         expect(Conversation.updateGroupMetadata).toHaveBeenCalledWith(
           conversationId,
-          { avatarUrl: null }
+          { avatarUrl: null },
+          mockClient // Transaction client
         );
       });
 
@@ -1007,6 +1010,10 @@ describe('Conversation Controller - Group Settings', () => {
     // --------------------------------------------------------------------------
     describe('Authorization', () => {
       it('should reject non-admin requester (403 Forbidden)', async () => {
+        mockClient.query
+          .mockResolvedValueOnce({ rows: [] }) // BEGIN
+          .mockResolvedValueOnce({ rows: [] }); // ROLLBACK (after auth check fails)
+
         Conversation.isAdmin.mockResolvedValue(false);
 
         const response = await request(app)
