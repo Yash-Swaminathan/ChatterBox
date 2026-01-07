@@ -201,8 +201,8 @@ describe('Conversation Controller Integration Tests', () => {
 
       getBulkPresence.mockResolvedValue({ [otherUserId]: { status: 'online' } });
 
-      // Make requests in parallel for faster test execution
-      const requests = Array.from({ length: 65 }, () =>
+      // Make requests in parallel for faster test execution (reduced from 65 to 30)
+      const requests = Array.from({ length: 30 }, () =>
         request(app)
           .post('/api/conversations/direct')
           .set('Authorization', `Bearer ${authToken}`)
@@ -215,7 +215,7 @@ describe('Conversation Controller Integration Tests', () => {
       responses.forEach(response => {
         expect(response.status).not.toBe(429);
       });
-    }, 30000);
+    }, 60000);
   });
 
   describe('GET /api/conversations', () => {

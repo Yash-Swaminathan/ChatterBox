@@ -295,8 +295,13 @@ function validateCreateGroupConversation(req, res, next) {
     } else if (avatarUrl.trim().length > 0) {
       // Basic URL validation
       try {
-        new URL(avatarUrl);
-      } catch (e) {
+        const parsedUrl = new URL(avatarUrl);
+        // Whitelist only HTTP/HTTPS protocols (prevent javascript:, data:, etc.)
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+          errors.push('avatarUrl must use HTTP or HTTPS protocol');
+        }
+      } catch (error) {
+        // Invalid URL format - validation will handle error message
         errors.push('avatarUrl must be a valid URL');
       }
     }
@@ -760,6 +765,147 @@ function validateAddParticipants() {
   };
 }
 
+/**
+ * Validate group settings update request
+ * - name: string (1-100 chars, optional)
+ * - avatarUrl: string (URL format, optional) or null to remove
+ * - At least one field must be provided
+ *
+ * // TODO (Week 18): Add profanity filter validation
+ * //   - Install 'bad-words' package
+ * //   - Filter group names for offensive content
+ * //   - Return 400 Bad Request with specific message
+ *
+ * // TODO (Week 18): Enhance URL validation
+ * //   - Check if URL is accessible (HTTP HEAD request)
+ * //   - Validate MIME type is image/*
+ * //   - Check file size < 5MB
+ * //   - Consider adding to uploadService instead
+ */
+const validateGroupSettings = (req, res, next) => {
+  const { name, avatarUrl } = req.body;
+
+  // At least one field must be provided
+  if (name === undefined && avatarUrl === undefined) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'At least one field (name or avatarUrl) must be provided',
+    });
+  }
+
+  // Validate name if provided
+  if (name !== undefined) {
+    // Check type
+    if (typeof name !== 'string') {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'name must be a string',
+      });
+    }
+
+    // Trim and check length
+    const trimmedName = name.trim();
+    if (trimmedName.length === 0) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'name cannot be empty',
+      });
+    }
+    if (trimmedName.length > 100) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'name cannot exceed 100 characters',
+      });
+    }
+
+    // Replace with trimmed version
+    req.body.name = trimmedName;
+  }
+
+  // Validate avatarUrl if provided
+  if (avatarUrl !== undefined) {
+    // Allow null to remove avatar
+    if (avatarUrl !== null) {
+      // Check type
+      if (typeof avatarUrl !== 'string') {
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'avatarUrl must be a string or null',
+        });
+      }
+
+      // Basic URL validation
+      const trimmedUrl = avatarUrl.trim();
+      if (trimmedUrl.length === 0) {
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'avatarUrl cannot be empty (use null to remove)',
+        });
+      }
+
+      // Check URL format
+      try {
+        const parsedUrl = new URL(trimmedUrl);
+        // Whitelist only HTTP/HTTPS protocols (prevent javascript:, data:, etc.)
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+          return res.status(400).json({
+            error: 'Validation Error',
+            message: 'avatarUrl must use HTTP or HTTPS protocol',
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'avatarUrl must be a valid URL',
+        });
+      }
+
+      // Replace with trimmed version
+      req.body.avatarUrl = trimmedUrl;
+    }
+  }
+
+  next();
+};
+
+/**
+ * Validate participant role update request
+ * - role: string ('admin' or 'member')
+ */
+const validateRoleUpdate = (req, res, next) => {
+  const { role } = req.body;
+
+  // Role is required
+  if (!role) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'role is required',
+    });
+  }
+
+  // Check type
+  if (typeof role !== 'string') {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'role must be a string',
+    });
+  }
+
+  // Validate allowed values
+  const allowedRoles = ['admin', 'member'];
+  if (!allowedRoles.includes(role.toLowerCase())) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: 'role must be either "admin" or "member"',
+    });
+  }
+
+  // Normalize to lowercase
+  req.body.role = role.toLowerCase();
+
+  next();
+};
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -778,4 +924,6 @@ module.exports = {
   validateUserSearch,
   validateUUID,
   validateAddParticipants,
+  validateGroupSettings,
+  validateRoleUpdate,
 };

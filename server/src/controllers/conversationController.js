@@ -703,6 +703,322 @@ async function removeParticipant(req, res) {
   }
 }
 
+/**
+ * Update group conversation settings (name, avatar)
+ * Admin-only endpoint
+ * PUT /api/conversations/:conversationId
+ *
+ * // TODO (Week 17): Add activity logging
+ * //   - Create conversation_activity table
+ * //   - Log: "Alice changed group name from 'X' to 'Y'"
+ * //   - Display in group info UI
+ *
+ * // TODO (Week 18): Add image validation for avatar URL
+ * //   - Verify URL points to valid image
+ * //   - Check file size and dimensions
+ * //   - Consider using uploadService for validation
+ */
+async function updateGroupSettings(req, res) {
+  const { conversationId } = req.params;
+  const { name, avatarUrl } = req.body;
+  const userId = req.user.userId;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Verify conversation exists
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Conversation not found',
+      });
+    }
+
+    // 2. Verify it's a group conversation
+    if (conversation.type !== 'group') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Only group conversations can be updated',
+      });
+    }
+
+    // 3. Verify requester is admin in this conversation
+    const isAdmin = await Conversation.isAdmin(conversationId, userId);
+    if (!isAdmin) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only group admins can update group settings',
+      });
+    }
+
+    // 4. Update group metadata with transaction client
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+
+    const updatedConversation = await Conversation.updateGroupMetadata(
+      conversationId,
+      updates,
+      client // Pass transaction client
+    );
+
+    await client.query('COMMIT');
+
+    // 5. Emit Socket.io event to all participants
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conversation:${conversationId}`).emit('conversation:updated', {
+        conversationId,
+        updates: {
+          name: updatedConversation.name,
+          avatarUrl: updatedConversation.avatar_url,
+        },
+        updatedBy: {
+          id: userId,
+        },
+        updatedAt: updatedConversation.updated_at,
+      });
+    }
+
+    // 6. Return updated conversation
+    res.status(200).json({
+      success: true,
+      data: {
+        conversation: {
+          id: updatedConversation.id,
+          type: updatedConversation.type,
+          name: updatedConversation.name,
+          avatarUrl: updatedConversation.avatar_url,
+          createdBy: updatedConversation.created_by,
+          createdAt: updatedConversation.created_at,
+          updatedAt: updatedConversation.updated_at,
+        },
+      },
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+
+    logger.error('Error updating group settings:', {
+      error: error.message,
+      conversationId,
+      userId,
+      stack: error.stack,
+    });
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update group settings',
+      ...(process.env.NODE_ENV === 'development' && { details: error.message }),
+    });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Update participant role (promote/demote admin)
+ * Admin-only endpoint
+ * PUT /api/conversations/:conversationId/participants/:userId/role
+ *
+ * // TODO (Week 17): Add role change history tracking
+ * //   - Create participant_role_history table
+ * //   - Track: who changed role, when, from what to what
+ * //   - Display in group admin logs
+ *
+ * // TODO (Week 18): Add granular permissions
+ * //   - Instead of just admin/member, support custom roles
+ * //   - Create group_roles table (e.g., moderator, editor)
+ * //   - Each role has specific permissions
+ */
+async function updateParticipantRole(req, res) {
+  const { conversationId, userId: targetUserId } = req.params;
+  const { role } = req.body; // 'admin' or 'member'
+  const requesterId = req.user.userId;
+
+  const client = await pool.connect();
+
+  try {
+    // Start transaction
+    await client.query('BEGIN');
+
+    // 1. Verify conversation exists and is a group
+    const conversationQuery = `
+      SELECT id, type
+      FROM conversations
+      WHERE id = $1
+      FOR UPDATE
+    `;
+    const conversationResult = await client.query(conversationQuery, [
+      conversationId,
+    ]);
+
+    if (conversationResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Conversation not found',
+      });
+    }
+
+    const conversation = conversationResult.rows[0];
+    if (conversation.type !== 'group') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Only group conversations support role management',
+      });
+    }
+
+    // 2. Verify requester is admin
+    const isAdmin = await Conversation.isAdmin(conversationId, requesterId);
+    if (!isAdmin) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only group admins can change participant roles',
+      });
+    }
+
+    // 3. Verify target user is an active participant
+    const targetParticipantQuery = `
+      SELECT user_id, is_admin, joined_at
+      FROM conversation_participants
+      WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL
+      FOR UPDATE
+    `;
+    const targetResult = await client.query(targetParticipantQuery, [
+      conversationId,
+      targetUserId,
+    ]);
+
+    if (targetResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Participant not found in this conversation',
+      });
+    }
+
+    const targetParticipant = targetResult.rows[0];
+    const isCurrentlyAdmin = targetParticipant.is_admin;
+    const targetIsAdmin = role === 'admin';
+
+    // 4. Check if role is already set (no-op)
+    if (isCurrentlyAdmin === targetIsAdmin) {
+      await client.query('ROLLBACK');
+      return res.status(200).json({
+        success: true,
+        message: `User is already ${role}`,
+        data: {
+          participant: {
+            userId: targetUserId,
+            role: targetIsAdmin ? 'admin' : 'member',
+            isAdmin: targetIsAdmin,
+          },
+        },
+      });
+    }
+
+    // 5. If demoting from admin, check if this is the last admin
+    if (isCurrentlyAdmin && !targetIsAdmin) {
+      const adminCount = await Conversation.getAdminCount(conversationId);
+
+      if (adminCount <= 1) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Cannot demote the last admin. Promote another member first.',
+        });
+      }
+    }
+
+    // 6. Update the participant role
+    await Conversation.updateParticipantRole(
+      conversationId,
+      targetUserId,
+      targetIsAdmin,
+      client
+    );
+
+    // 7. Get target user details for Socket.io event
+    const userQuery = `
+      SELECT id, username, display_name, avatar_url
+      FROM users
+      WHERE id = $1
+    `;
+    const userResult = await client.query(userQuery, [targetUserId]);
+    const targetUser = userResult.rows[0];
+
+    // Commit transaction
+    await client.query('COMMIT');
+
+    // 8. Emit Socket.io event to all participants
+    const io = req.app.get('io');
+    if (io) {
+      const eventName = targetIsAdmin
+        ? 'conversation:admin-promoted'
+        : 'conversation:admin-demoted';
+
+      io.to(`conversation:${conversationId}`).emit(eventName, {
+        conversationId,
+        participant: {
+          userId: targetUser.id,
+          username: targetUser.username,
+          displayName: targetUser.display_name,
+          avatarUrl: targetUser.avatar_url,
+          role: targetIsAdmin ? 'admin' : 'member',
+          isAdmin: targetIsAdmin,
+        },
+        changedBy: {
+          id: requesterId,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // 9. Return success response
+    res.status(200).json({
+      success: true,
+      data: {
+        participant: {
+          userId: targetUser.id,
+          username: targetUser.username,
+          displayName: targetUser.display_name,
+          avatarUrl: targetUser.avatar_url,
+          role: targetIsAdmin ? 'admin' : 'member',
+          isAdmin: targetIsAdmin,
+          joinedAt: targetParticipant.joined_at,
+        },
+      },
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+
+    logger.error('Error updating participant role:', {
+      error: error.message,
+      conversationId,
+      targetUserId,
+      role,
+      requesterId,
+      stack: error.stack,
+    });
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update participant role',
+      ...(process.env.NODE_ENV === 'development' && { details: error.message }),
+    });
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   createDirectConversation,
   createGroupConversation,
@@ -710,4 +1026,6 @@ module.exports = {
   getGroupParticipants,
   addParticipants,
   removeParticipant,
+  updateGroupSettings,
+  updateParticipantRole,
 };
