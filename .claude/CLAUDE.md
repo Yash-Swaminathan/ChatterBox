@@ -21,13 +21,48 @@
 
 ---
 
-## 🎯 CURRENT FOCUS: WEEK 7 - Group Messaging Foundations
+## 🎯 CURRENT FOCUS: WEEK 8 - Group Management & Polish
 
-**Status**: Week 7 Day 3-4 COMPLETE ✅ | 593 tests (589 passing, 4 skipped) - 98.7% pass rate
+**Status**: Week 8 Day 1-2 COMPLETE ✅ | 628 tests (624 passing, 4 skipped) - 99.4% pass rate
 
 ---
 
-### 🚀 WEEK 7: Group Messaging System - Foundations (4 hours)
+### 🚀 WEEK 8: Group Management & Polish (4 hours)
+
+**Day 1-2: Add/Remove Participants (2 hours)** - ✅ COMPLETED
+- [x] POST /api/conversations/:id/participants (admin-only) - Batch add up to 10 users
+- [x] DELETE /api/conversations/:id/participants/:userId (admin-only or self-removal)
+- [x] Tests: 31 comprehensive tests passing (admin permissions, self-removal, left_at tracking)
+- [x] **CRITICAL FIX**: Race condition in removeParticipant() - Implemented database transactions with row-level locking
+- [x] **SECURITY FIX**: SQL injection risk in addParticipants() - Replaced dynamic VALUES with `unnest($2::uuid[])`
+- [x] Last admin protection: Auto-promote oldest member when last admin leaves
+- [x] Prevent removing last participant from group
+- [x] Socket.io events: `conversation:participant-added`, `conversation:participant-removed`, `conversation:admin-promoted`
+- [x] Transaction safety with `FOR UPDATE` row-level locking
+- [x] Window functions for efficient counting (active participants, admin count)
+
+**Key Technical Achievements:**
+- Database transactions prevent race conditions in concurrent admin removal
+- Atomic check-and-update for last admin protection
+- Soft delete pattern with `left_at` timestamp preserves history
+- Auto-promotion logic ensures groups always have at least one admin
+- Comprehensive test coverage: Success, Authorization, Validation, Error, Last Admin Protection
+
+**Day 3: Group Settings (1 hour)** - ⏳ NEXT
+- [ ] PUT /api/conversations/:id - Update group name/avatar (admin-only)
+- [ ] PUT /api/conversations/:id/participants/:userId/role (promote/demote)
+- [ ] Tests: role changes, admin-only
+
+**Day 4-5: Group Polish & Testing (1 hour)**
+- [ ] Message mentions (@username) - simple version
+- [ ] Group leave functionality (already implemented as self-removal!)
+- [ ] Integration tests: full group lifecycle
+
+**✅ Milestone 7b Progress**: 50% complete (Add/Remove done, Settings pending)
+
+---
+
+### 🚀 WEEK 7: Group Messaging System - Foundations (4 hours) - ✅ COMPLETED
 
 **Day 1-2: Group Conversation Creation (2 hours)** - ✅ COMPLETED
 - [x] POST /api/conversations/group endpoint (min 3 participants)
@@ -47,7 +82,7 @@
 
 **Key Discovery**: 90% of group messaging already worked! Message handler is generic and supports both direct and group conversations without changes.
 
-**Deferred to Week 17/18**: Typing indicators for groups, full edit history, enhanced mentions, group read receipts, group permissions, invite links, archiving/muting endpoints, last admin protection. See `.claude/WEEK7_DAY3-4_DEFERRED.md` for details.
+**Deferred to Week 17/18**: Typing indicators for groups, full edit history, enhanced mentions, group read receipts, group permissions, invite links, archiving/muting endpoints (now in Week 8!). See `.claude/WEEK7_DAY3-4_DEFERRED.md` for details.
 
 **✅ Milestone 7a**: Group conversation foundation complete (100%)
 
@@ -94,28 +129,6 @@
 - Optimized contact discovery
 
 **✅ Milestone 6**: Complete contact management system
-
----
-
-### 🚀 WEEK 8: Group Management & Polish (4 hours)
-
-**Day 1-2: Add/Remove Participants (2 hours)**
-- [ ] POST /api/conversations/:id/participants (admin-only)
-- [ ] DELETE /api/conversations/:id/participants/:userId (admin-only or self-removal)
-- [ ] Tests: admin permissions, self-removal, left_at tracking
-
-**Day 3: Group Settings (1 hour)**
-- [ ] PUT /api/conversations/:id - Update group name/avatar (admin-only)
-- [ ] PUT /api/conversations/:id/participants/:userId/role (promote/demote)
-- [ ] Tests: role changes, admin-only
-
-**Day 4-5: Group Polish & Testing (1 hour)**
-- [ ] Message mentions (@username) - simple version
-- [ ] Group leave functionality (self-removal)
-- [ ] Last admin protection (can't remove last admin)
-- [ ] Integration tests: full group lifecycle
-
-**✅ Milestone 7**: Feature-complete group messaging system
 
 ---
 
@@ -172,20 +185,21 @@
 - **Week 4**: Basic Messaging ✅ (100%)
 - **Week 5**: Enhanced Messaging ✅ (100%)
 - **Week 6**: Contact System Foundation ✅ (100%)
-- **Week 7**: Group Messaging Foundations ⏳ (50% - Day 1-2 complete)
+- **Week 7**: Group Messaging Foundations ✅ (100%)
+- **Week 8**: Group Management & Polish ⏳ (50% - Day 1-2 complete)
 
 ### **Upcoming Weeks (Target: Week 10 Deployment)**
-- **Week 7 Day 3-4**: Group messaging Socket.io handlers (in progress)
-- **Week 8**: Group Management & Polish (pending)
+- **Week 8 Day 1-2**: Add/Remove Participants ✅ COMPLETE
+- **Week 8 Day 3-5**: Group Settings & Polish (next up)
 - **Week 9**: Minimal Viable Frontend (pending)
 - **Week 10**: Deployment & Polish (pending)
 
 ### **Stats**
-- **Total Tests**: 580 (576 passing, 4 skipped) - 99.3% pass rate ✅
+- **Total Tests**: 628 (624 passing, 4 skipped) - 99.4% pass rate ✅
 - **Code Quality**: 0 ESLint errors, 8 warnings ✅
-- **Database Migrations**: 11 applied ✅
-- **API Endpoints**: 27+ routes with rate limiting ✅
-- **Group Features**: Auto-naming, role-based access, type filtering ✅
+- **Database Migrations**: 17 applied ✅
+- **API Endpoints**: 29+ routes with rate limiting ✅
+- **Group Features**: Auto-naming, role-based access, add/remove participants, last admin protection ✅
 
 ---
 
