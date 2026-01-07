@@ -295,9 +295,13 @@ function validateCreateGroupConversation(req, res, next) {
     } else if (avatarUrl.trim().length > 0) {
       // Basic URL validation
       try {
-        new URL(avatarUrl);
+        const parsedUrl = new URL(avatarUrl);
+        // Whitelist only HTTP/HTTPS protocols (prevent javascript:, data:, etc.)
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+          errors.push('avatarUrl must use HTTP or HTTPS protocol');
+        }
       } catch (error) {
-        console.error('Error validating avatarUrl:', error);
+        // Invalid URL format - validation will handle error message
         errors.push('avatarUrl must be a valid URL');
       }
     }
@@ -841,9 +845,15 @@ const validateGroupSettings = (req, res, next) => {
 
       // Check URL format
       try {
-        new URL(trimmedUrl);
+        const parsedUrl = new URL(trimmedUrl);
+        // Whitelist only HTTP/HTTPS protocols (prevent javascript:, data:, etc.)
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+          return res.status(400).json({
+            error: 'Validation Error',
+            message: 'avatarUrl must use HTTP or HTTPS protocol',
+          });
+        }
       } catch (error) {
-        console.error('Error validating avatarUrl:', error);
         return res.status(400).json({
           error: 'Validation Error',
           message: 'avatarUrl must be a valid URL',

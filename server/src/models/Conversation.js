@@ -660,6 +660,7 @@ class Conversation {
    * @param {Object} updates - Updates object
    * @param {string} [updates.name] - New group name (1-100 chars)
    * @param {string} [updates.avatarUrl] - New avatar URL (or null to remove)
+   * @param {Object} [client] - Optional database client for transactions
    * @returns {Promise<Object>} Updated conversation
    * @throws {Error} If no fields to update or conversation not found
    *
@@ -678,7 +679,8 @@ class Conversation {
    * //   - Reject names with offensive content
    * //   - Return clear error message
    */
-  static async updateGroupMetadata(conversationId, updates) {
+  static async updateGroupMetadata(conversationId, updates, client = null) {
+    const db = client || pool;
     const { name, avatarUrl } = updates;
 
     // Build dynamic SET clause based on provided fields
@@ -712,7 +714,7 @@ class Conversation {
       RETURNING *
     `;
 
-    const result = await pool.query(query, values);
+    const result = await db.query(query, values);
 
     if (result.rows.length === 0) {
       throw new Error('Group conversation not found');

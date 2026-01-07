@@ -103,8 +103,26 @@ router.delete(
 
 /**
  * Update participant role (promote/demote admin)
- * PUT /api/conversations/:conversationId/participants/:userId/role
- * Authorization: Admin-only
+ *
+ * @route PUT /api/conversations/:conversationId/participants/:userId/role
+ * @access Admin-only
+ * @ratelimit 60 requests per minute (shared with conversation creation)
+ *
+ * @param {string} req.params.conversationId - UUID of group conversation
+ * @param {string} req.params.userId - UUID of participant to promote/demote
+ * @param {string} req.body.role - 'admin' or 'member' (case-insensitive)
+ *
+ * @returns {Object} 200 - Success response with updated participant
+ * @returns {Object} 400 - Invalid input or last admin demotion attempt
+ * @returns {Object} 403 - Non-admin requester
+ * @returns {Object} 404 - Conversation or participant not found
+ * @returns {Object} 429 - Rate limit exceeded (60 req/min)
+ * @returns {Object} 500 - Internal server error
+ *
+ * @example
+ * // Promote user to admin
+ * PUT /api/conversations/abc-123/participants/user-456/role
+ * Body: { "role": "admin" }
  */
 router.put(
   '/:conversationId/participants/:userId/role',
@@ -112,21 +130,49 @@ router.put(
   validateUUID('conversationId'),
   validateUUID('userId'),
   validateRoleUpdate,
-  createConversationLimiter, // Reuse existing limiter (60 req/min)
+  createConversationLimiter, // Rate limit: 60 req/min (shared with POST /api/conversations)
   conversationController.updateParticipantRole
 );
 
 /**
  * Update group settings (name, avatar)
- * PUT /api/conversations/:conversationId
- * Authorization: Admin-only
+ *
+ * @route PUT /api/conversations/:conversationId
+ * @access Admin-only
+ * @ratelimit 60 requests per minute (shared with conversation creation)
+ *
+ * @param {string} req.params.conversationId - UUID of group conversation
+ * @param {string} [req.body.name] - New group name (1-100 chars, trimmed, optional)
+ * @param {string|null} [req.body.avatarUrl] - New avatar URL (HTTP/HTTPS only) or null to remove (optional)
+ *
+ * @returns {Object} 200 - Success response with updated conversation
+ * @returns {Object} 400 - Invalid input, not a group conversation, or no fields provided
+ * @returns {Object} 403 - Non-admin requester
+ * @returns {Object} 404 - Conversation not found
+ * @returns {Object} 429 - Rate limit exceeded (60 req/min)
+ * @returns {Object} 500 - Internal server error
+ *
+ * @example
+ * // Update group name only
+ * PUT /api/conversations/abc-123
+ * Body: { "name": "New Group Name" }
+ *
+ * @example
+ * // Update both name and avatar
+ * PUT /api/conversations/abc-123
+ * Body: { "name": "Updated Name", "avatarUrl": "https://example.com/avatar.jpg" }
+ *
+ * @example
+ * // Remove avatar
+ * PUT /api/conversations/abc-123
+ * Body: { "avatarUrl": null }
  */
 router.put(
   '/:conversationId',
   requireAuth,
   validateUUID('conversationId'),
   validateGroupSettings,
-  createConversationLimiter, // Reuse existing limiter (60 req/min)
+  createConversationLimiter, // Rate limit: 60 req/min (shared with POST /api/conversations)
   conversationController.updateGroupSettings
 );
 
