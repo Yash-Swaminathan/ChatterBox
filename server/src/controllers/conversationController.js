@@ -723,10 +723,15 @@ async function updateGroupSettings(req, res) {
   const { name, avatarUrl } = req.body;
   const userId = req.user.userId;
 
+  const client = await pool.connect();
+
   try {
+    await client.query('BEGIN');
+
     // 1. Verify conversation exists
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         error: 'Not Found',
         message: 'Conversation not found',
@@ -735,6 +740,7 @@ async function updateGroupSettings(req, res) {
 
     // 2. Verify it's a group conversation
     if (conversation.type !== 'group') {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Only group conversations can be updated',
@@ -744,21 +750,25 @@ async function updateGroupSettings(req, res) {
     // 3. Verify requester is admin in this conversation
     const isAdmin = await Conversation.isAdmin(conversationId, userId);
     if (!isAdmin) {
+      await client.query('ROLLBACK');
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Only group admins can update group settings',
       });
     }
 
-    // 4. Update group metadata
+    // 4. Update group metadata with transaction client
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
 
     const updatedConversation = await Conversation.updateGroupMetadata(
       conversationId,
-      updates
+      updates,
+      client // Pass transaction client
     );
+
+    await client.query('COMMIT');
 
     // 5. Emit Socket.io event to all participants
     const io = req.app.get('io');
@@ -771,7 +781,6 @@ async function updateGroupSettings(req, res) {
         },
         updatedBy: {
           id: userId,
-          username: req.user.username,
         },
         updatedAt: updatedConversation.updated_at,
       });
@@ -793,6 +802,8 @@ async function updateGroupSettings(req, res) {
       },
     });
   } catch (error) {
+    await client.query('ROLLBACK');
+
     logger.error('Error updating group settings:', {
       error: error.message,
       conversationId,
@@ -805,6 +816,8 @@ async function updateGroupSettings(req, res) {
       message: 'Failed to update group settings',
       ...(process.env.NODE_ENV === 'development' && { details: error.message }),
     });
+  } finally {
+    client.release();
   }
 }
 
@@ -964,7 +977,6 @@ async function updateParticipantRole(req, res) {
         },
         changedBy: {
           id: requesterId,
-          username: req.user.username,
         },
         timestamp: new Date().toISOString(),
       });
