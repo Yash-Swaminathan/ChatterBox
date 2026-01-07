@@ -1012,6 +1012,9 @@ describe('Conversation Controller - Group Settings', () => {
       it('should reject non-admin requester (403 Forbidden)', async () => {
         mockClient.query
           .mockResolvedValueOnce({ rows: [] }) // BEGIN
+          .mockResolvedValueOnce({
+            rows: [{ id: conversationId, type: 'group' }],
+          }) // Conversation exists and is group
           .mockResolvedValueOnce({ rows: [] }); // ROLLBACK (after auth check fails)
 
         Conversation.isAdmin.mockResolvedValue(false);
