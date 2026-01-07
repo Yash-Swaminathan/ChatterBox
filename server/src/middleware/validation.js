@@ -296,7 +296,8 @@ function validateCreateGroupConversation(req, res, next) {
       // Basic URL validation
       try {
         new URL(avatarUrl);
-      } catch (e) {
+      } catch (error) {
+        console.error('Error validating avatarUrl:', error);
         errors.push('avatarUrl must be a valid URL');
       }
     }
@@ -842,6 +843,7 @@ const validateGroupSettings = (req, res, next) => {
       try {
         new URL(trimmedUrl);
       } catch (error) {
+        console.error('Error validating avatarUrl:', error);
         return res.status(400).json({
           error: 'Validation Error',
           message: 'avatarUrl must be a valid URL',
