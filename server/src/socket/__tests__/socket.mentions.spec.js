@@ -1,14 +1,3 @@
-/**
- * @fileoverview Message Mentions Unit Tests
- * @module socket.mentions.spec
- *
- * Tests for @username mention functionality in group conversations
- * Week 8 Day 4-5: Group Polish & Testing
- *
- * APPROACH: Unit tests for mention extraction logic
- * The actual mention extraction happens in messageHandler.js lines 333-348
- */
-
 describe('Message Mentions (@username) - Unit Tests', () => {
   // Mock participants data
   const mockParticipants = [
