@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const bcrypt = require('../utils/bcrypt');
+const { generateAccessToken } = require('../utils/jwt');
 
 
 async function beginTestTransaction() {
@@ -24,6 +25,13 @@ async function rollbackTestTransaction(client) {
   } finally {
     client.release(); // Always release, even if rollback fails
   }
+}
+
+/**
+ * Generates a test token for a user.
+ */
+function generateTestToken(user) {
+  return generateAccessToken(user);
 }
 
 /**
@@ -142,12 +150,16 @@ async function createTestSetup(client, options = {}) {
     participants.push(participant);
   }
 
-  return { users, conversation, participants };
+  // Generate tokens for each user
+  const tokens = users.map(user => generateTestToken(user));
+
+  return { users, tokens, conversation, participants };
 }
 
 module.exports = {
   beginTestTransaction,
   rollbackTestTransaction,
+  generateTestToken,
   createTestUser,
   createTestConversation,
   addTestParticipant,
