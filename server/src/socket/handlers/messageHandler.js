@@ -330,6 +330,22 @@ async function handleMessageSend(io, socket, data) {
     const participants = await Conversation.getParticipants(conversationId);
     const recipientIds = participants.map(p => p.user_id).filter(id => id !== userId);
 
+    // Extract and validate @mentions
+    const MAX_MENTIONS_PER_MESSAGE = 50;
+    const mentionRegex = /@(\w+)/g;
+    const mentionMatches = content.match(mentionRegex) || [];
+    const mentionedUsernames = [...new Set(
+      mentionMatches.map(m => m.slice(1).toLowerCase())
+    )].slice(0, MAX_MENTIONS_PER_MESSAGE);
+
+    const participantMap = new Map(
+      participants.map(p => [p.username.toLowerCase(), p.user_id])
+    );
+
+    const mentionedUserIds = mentionedUsernames
+      .filter(username => participantMap.has(username))
+      .map(username => participantMap.get(username));
+
     // Create initial message status entries (sent) for all recipients
     if (recipientIds.length > 0) {
       await MessageStatus.createInitialStatus(message.id, recipientIds);
@@ -353,7 +369,20 @@ async function handleMessageSend(io, socket, data) {
       createdAt: message.created_at,
       sender: message.sender,
       tempId,
+      mentionedUserIds,
     });
+
+    // Emit mention notifications to mentioned users
+    for (const mentionedUserId of mentionedUserIds) {
+      io.to(`user:${mentionedUserId}`).emit('message:mentioned', {
+        messageId: message.id,
+        conversationId: message.conversation_id,
+        senderId: message.sender_id,
+        content: message.content,
+        createdAt: message.created_at,
+        sender: message.sender,
+      });
+    }
 
     // Send confirmation to sender
     socket.emit('message:sent', {
