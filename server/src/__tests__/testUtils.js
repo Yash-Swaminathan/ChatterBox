@@ -29,6 +29,11 @@ async function rollbackTestTransaction(client) {
 
 /**
  * Generates a test token for a user.
+ * @param {Object} user - User object
+ * @param {string} user.id - User UUID
+ * @param {string} user.username - Username
+ * @param {string} user.email - Email address
+ * @returns {string} JWT access token
  */
 function generateTestToken(user) {
   return generateAccessToken(user);
