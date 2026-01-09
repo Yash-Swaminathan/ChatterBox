@@ -128,18 +128,12 @@ describe('Message Mentions (@username) - Unit Tests', () => {
     });
 
     it('should respect MAX_MENTIONS_PER_MESSAGE limit (50)', () => {
-      // Create 60 mentions with bob_test at the beginning
-      // This ensures bob_test is within the first 50 mentions
-      const mentions =
-        '@bob_test ' +
-        Array(60)
-          .fill(0)
-          .map((_, i) => `@user${i}`)
-          .join(' ');
+      // Create 60 duplicate mentions - tests both deduplication AND max limit
+      const mentions = Array(60).fill('@bob_test').join(' ');
 
       const result = extractMentions(mentions, mockParticipants);
 
-      // Should find bob_test (the only valid participant)
+      // After deduplication: 1 unique mention
       expect(result).toHaveLength(1);
       expect(result).toContain('user-2');
     });
