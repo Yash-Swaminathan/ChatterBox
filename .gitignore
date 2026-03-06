@@ -7,3 +7,4 @@ client/.env
 .history/
 test-user-api.sh
 .env.example
+.claude/settings.local.json
