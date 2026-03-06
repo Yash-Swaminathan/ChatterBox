@@ -45,7 +45,7 @@ export const validators = {
   },
 
   displayName(value) {
-    if (!value) return null; // Optional field
+    if (!value) return null; // Optional 
     if (value.length > 100) {
       return 'Display name must be less than 100 characters';
     }
