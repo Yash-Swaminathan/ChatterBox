@@ -1,0 +1,6 @@
+/* Minimal reset - global.css handles all styling */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
