@@ -8,3 +8,4 @@ client/.env
 test-user-api.sh
 .env.example
 .claude/settings.local.json
+.claude/useful_kinda/

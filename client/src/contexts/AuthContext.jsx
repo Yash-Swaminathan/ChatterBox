@@ -27,7 +27,7 @@ export function AuthProvider({ children }) {
           setUser(userData);
 
           // Start refresh interval
-          startTokenRefresh(refreshToken);
+          startTokenRefresh();
         }
       } catch (err) {
         console.error('Failed to restore session:', err);
@@ -62,7 +62,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Auto-refresh token every 12 minutes (access token expires in 15 min)
-  const startTokenRefresh = useCallback((refreshToken) => {
+  const startTokenRefresh = useCallback(() => {
     // Clear any existing interval
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
@@ -70,14 +70,19 @@ export function AuthProvider({ children }) {
 
     refreshIntervalRef.current = setInterval(async () => {
       try {
-        const { accessToken } = await authAPI.refreshToken(refreshToken);
+        const currentRefreshToken = storage.get(STORAGE_KEYS.REFRESH_TOKEN);
+        if (!currentRefreshToken) {
+          logout();
+          return;
+        }
+        const { accessToken } = await authAPI.refreshToken(currentRefreshToken);
         setAccessToken(accessToken);
       } catch (err) {
         console.error('Failed to refresh token:', err);
         logout();
       }
     }, 12 * 60 * 1000); // 12 minutes
-  }, []);
+  }, [logout]);
 
   // Register
   const register = useCallback(async (userData) => {
@@ -93,7 +98,7 @@ export function AuthProvider({ children }) {
       storage.set(STORAGE_KEYS.USER, newUser);
 
       setUser(newUser);
-      startTokenRefresh(refreshToken);
+      startTokenRefresh();
 
       return { success: true };
     } catch (err) {
@@ -122,7 +127,7 @@ export function AuthProvider({ children }) {
       storage.set(STORAGE_KEYS.USER, loggedInUser);
 
       setUser(loggedInUser);
-      startTokenRefresh(refreshToken);
+      startTokenRefresh();
 
       return { success: true };
     } catch (err) {

@@ -238,6 +238,9 @@
 - [ ] Scroll to bottom on new message
 - [ ] Loading states + error messages
 - [ ] Mobile responsive (basic)
+- [ ] Fix: stale refresh token in AuthContext interval (read from storage each tick)
+- [ ] Fix: SocketContext cleanup should disconnect unconditionally on unmount
+- [ ] Fix: move refresh token from localStorage to httpOnly cookie (XSS mitigation)
 
 **Day 4-5: Deployment (1.5 hours)**
 - [ ] Docker setup (server + client Dockerfiles)

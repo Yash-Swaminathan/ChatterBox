@@ -60,10 +60,9 @@ export function SocketProvider({ children }) {
       setSocket(newSocket);
     }
 
-    // Cleanup on logout
+    // Cleanup on unmount or when dependencies change
     return () => {
-      if (!isAuthenticated && socketRef.current) {
-        console.log('Disconnecting socket due to logout');
+      if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
         setSocket(null);
@@ -86,14 +85,14 @@ export function SocketProvider({ children }) {
     if (socketRef.current) {
       socketRef.current.on(event, callback);
     }
-  }, []);
+  }, [socket]);
 
   // Remove listener helper
   const off = useCallback((event, callback) => {
     if (socketRef.current) {
       socketRef.current.off(event, callback);
     }
-  }, []);
+  }, [socket]);
 
   const value = {
     socket,
