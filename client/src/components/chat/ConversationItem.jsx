@@ -1,19 +1,21 @@
 export function ConversationItem({ conversation, active = false }) {
+  const displayName = conversation.name || 'Unknown';
+
   return (
     <div className={`conversation-item ${active ? 'active' : ''}`}>
       <div className="conversation-avatar">
         {conversation.avatarUrl ? (
-          <img src={conversation.avatarUrl} alt={conversation.name} />
+          <img src={conversation.avatarUrl} alt={displayName} />
         ) : (
           <div className="avatar-placeholder">
-            {conversation.name[0].toUpperCase()}
+            {displayName[0].toUpperCase()}
           </div>
         )}
       </div>
 
       <div className="conversation-content">
         <div className="conversation-header">
-          <h4>{conversation.name}</h4>
+          <h4>{displayName}</h4>
           <span className="timestamp">{conversation.timestamp}</span>
         </div>
         <div className="conversation-preview">

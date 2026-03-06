@@ -163,18 +163,34 @@ async function sendPushNotification(senderUsername, messagePreview) {
 }
 
 /**
+ * Escapes HTML special characters to prevent XSS
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Sends an email via Resend (free tier: 3,000/month)
  */
 async function sendEmailNotification(senderUsername, messagePreview) {
   try {
+    const safeSenderUsername = escapeHtml(senderUsername);
+    const safeMessagePreview = escapeHtml(messagePreview);
+
     await resend.emails.send({
       from: 'ChatterBox <notifications@yourdomain.com>',
       to: process.env.OWNER_EMAIL,
-      subject: `New message from ${senderUsername}`,
+      subject: `New message from ${safeSenderUsername}`,
       html: `
-        <p><strong>${senderUsername}</strong> sent you a message on ChatterBox:</p>
+        <p><strong>${safeSenderUsername}</strong> sent you a message on ChatterBox:</p>
         <blockquote style="border-left: 3px solid #7c6af7; padding-left: 12px; color: #555;">
-          ${messagePreview}
+          ${safeMessagePreview}
         </blockquote>
         <p><a href="https://yourapp.com/chat">Reply now →</a></p>
       `,

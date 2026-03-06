@@ -107,8 +107,13 @@ api.interceptors.response.use(
             { refreshToken }
           );
 
-          const newAccessToken = response.data.data.accessToken;
+          const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.data;
           setAccessToken(newAccessToken);
+
+          // Save new refresh token if server rotates tokens
+          if (newRefreshToken) {
+            storage.set(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
+          }
 
           isRefreshing = false;
           processQueue(null, newAccessToken);
