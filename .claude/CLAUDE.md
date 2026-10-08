@@ -2,11 +2,11 @@
 
 > A production-ready MVP messaging platform with real-time communication, contact management, and extensible architecture
 
-**Status**: Week 10 NEXT (Week 9 complete: working chat UI, live delivery, owner-only lockdown) | 750 server tests
+**Status**: Week 11 NEXT (Weeks 9-10 complete: chat UI, live delivery, owner-only lockdown, notifications, password reset) | 805 server tests
 
 **Goal**: A portfolio visitor can open the site, message the owner, and the owner gets notified.
 
-**Critical path to the goal (~11 hours left)**: Week 10 (notifications + password reset) → Week 11 (polish + deploy). Week 12 and the backlog come after launch.
+**Critical path to the goal (~6 hours left)**: Week 11 (polish + deploy). Week 12 and the backlog come after launch.
 
 ---
 
@@ -264,31 +264,31 @@
 
 ---
 
-### Week 10: Notifications & Password Reset (5 hours) - PENDING
+### Week 10: Notifications & Password Reset (5 hours) - COMPLETED (code); owner setup below still to do
 
 **Day 1: Owner notifications (1.5 hours)**
-- [ ] `npm install resend`; `notificationService.js` with ntfy.sh push + Resend email (HTML-escaped)
-- [ ] Env: `NTFY_TOPIC`, `RESEND_API_KEY`, `OWNER_EMAIL`, `EMAIL_FROM`, `APP_URL`
-- [ ] Hook into `message:send`: notify when a recipient is the owner and the owner is offline or it is the first message of the conversation
-- [ ] Cap: at most one notification per conversation per 10 minutes, and 30 per hour overall
-- [ ] Set up ntfy app on phone + Resend account with a verified sender
+- [x] `notificationService.js` with ntfy.sh push + Resend email (HTML-escaped). Both are plain `fetch` calls, so the `resend` package is not needed
+- [x] Env: `NTFY_TOPIC`, `RESEND_API_KEY`, `OWNER_EMAIL`, `EMAIL_FROM`, `APP_URL`
+- [x] Hook into `message:send`: notify when a recipient is the owner and the owner is offline or it is the first message of the conversation
+- [x] Cap: at most one notification per conversation per 10 minutes, and 30 per hour overall
+- [ ] **Owner setup**: install the ntfy app and subscribe to a hard-to-guess topic (`NTFY_TOPIC`); create a Resend account, verify a sender, set `RESEND_API_KEY`, `EMAIL_FROM`, `OWNER_EMAIL`. Until then pushes and emails are skipped (in development the password reset link is written to the server log instead)
 
 **Day 2: Owner reminder (1 hour)**
-- [ ] Redis sorted set `reminders:pending` (score = due time, member = conversationId), added on visitor message
-- [ ] Removed when the owner replies
-- [ ] 60s `setInterval` sweep fires due reminders: "You haven't replied to {username} yet - they messaged 90 min ago"
+- [x] Redis sorted set `reminders:pending` (score = due time, member = conversationId), added on visitor message
+- [x] Removed when the owner replies
+- [x] 60s `setInterval` sweep fires due reminders: "You haven't replied to {username} yet - they messaged 90 min ago"
 
 **Day 3: Visitor reply email (1 hour)**
-- [ ] When the owner sends a message and the recipient has no active socket, email the recipient: "{owner} replied to you" with a link back
-- [ ] At most one email per conversation per 30 minutes
-- [ ] `users.email_notifications` column (default true) + unsubscribe link in the email
+- [x] When the owner sends a message and the recipient has no active socket, email the recipient: "{owner} replied to you" with a link back
+- [x] At most one email per conversation per 30 minutes
+- [x] `users.email_notifications` column (default true, migration 019) + unsubscribe link in the email (GET /api/users/unsubscribe, signed token, no login)
 
 **Day 4-5: Password reset (1.5 hours)**
-- [ ] `password_resets` table: user_id, token_hash, expires_at (30 min), used_at
-- [ ] POST /api/auth/forgot-password { email }: always returns 200; rate limited (3/hour per IP and per email); emails a single-use link
-- [ ] POST /api/auth/reset-password { token, password }: sets password, marks token used, revokes all sessions
-- [ ] Client: "Forgot password?" link, forgot-password page, reset-password page
-- [ ] Tests
+- [x] `password_resets` table (migration 020): user_id, token_hash, expires_at (30 min), used_at
+- [x] POST /api/auth/forgot-password { email }: always returns 200; rate limited (3/hour per IP and per email); emails a single-use link
+- [x] POST /api/auth/reset-password { token, password }: sets password, marks token used, revokes all sessions
+- [x] Client: "Forgot password?" link, forgot-password page, reset-password page
+- [x] Tests
 
 **Notification Flow**
 ```
@@ -319,12 +319,13 @@ Visitor sends message → recipient is OWNER_USER_ID?
 - [ ] `config/database.js`: `DATABASE_URL` + SSL, longer connect timeout, stop logging every query text
 - [ ] `app.set('trust proxy', 1)` so rate limits use the real client IP
 - [ ] Make MinIO optional: `initializeBucket()` failure must not exit the server
-- [ ] Migrations: runner skips `*_rollback.sql`; resolve missing 003, 004, 014-016; verify a clean run on an empty database
+- [x] Migrations: runner skips `*_rollback.sql`
+- [ ] Migrations: resolve missing 003, 004, 014-016 (the repo has no migration that adds `conversations.name/avatar_url/created_by`); verify a clean run on an empty database
 - [ ] Remove hardcoded credentials from anything production-facing
-- [ ] `messageCacheService` calls `redisClient.zRevRange`, which does not exist in node-redis v5: every cache read errors and falls back to the database. Switch to `zRange(..., { REV: true })` and test the cached path
-- [ ] Local dev database has no `contacts` table (the runner executed the rollback files); rebuild it once the runner is fixed
-- [ ] `socket.integration.spec.js` hardcodes port 3001 and fails when that port is in use; use an ephemeral port
-- [ ] Add a favicon (the browser's default request 404s)
+- [x] `messageCacheService` called `redisClient.zRevRange`, which does not exist in node-redis v5; now `zRange(..., { REV: true })`, and a full cached page returns a cursor so older messages stay reachable
+- [x] Local dev database had no `contacts` table (the runner executed the rollback files); the missing migrations were re-applied by hand
+- [x] `socket.integration.spec.js` hardcoded port 3001; it now uses an ephemeral port
+- [x] Add a favicon
 
 **Day 4-5: Deploy (2 hours)**
 - [ ] One Dockerfile (or Nixpacks) building client then running server

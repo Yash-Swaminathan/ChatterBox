@@ -69,6 +69,63 @@ function validateRegistration(req, res, next) {
 }
 
 /**
+ * Validate forgot-password input
+ */
+function validateForgotPassword(req, res, next) {
+  const { email } = req.body;
+
+  if (!email || typeof email !== 'string' || email.trim().length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid input',
+        details: ['Email is required'],
+      },
+    });
+  }
+
+  next();
+}
+
+/**
+ * Validate reset-password input (same password rules as registration)
+ */
+function validateResetPassword(req, res, next) {
+  const { token, password } = req.body;
+  const errors = [];
+
+  if (!token || typeof token !== 'string') {
+    errors.push('Reset token is required');
+  }
+
+  if (!password || typeof password !== 'string' || password.length === 0) {
+    errors.push('Password is required');
+  } else if (password.length < 8) {
+    errors.push('Password must be at least 8 characters');
+  } else if (password.length > 100) {
+    errors.push('Password must be less than 100 characters');
+  } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+    errors.push(
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+    );
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid input',
+        details: errors,
+      },
+    });
+  }
+
+  next();
+}
+
+/**
  * Validate login input
  */
 function validateLogin(req, res, next) {
@@ -909,6 +966,8 @@ const validateRoleUpdate = (req, res, next) => {
 module.exports = {
   validateRegistration,
   validateLogin,
+  validateForgotPassword,
+  validateResetPassword,
   validateProfileUpdate,
   validateStatusUpdate,
   validateCreateDirectConversation,

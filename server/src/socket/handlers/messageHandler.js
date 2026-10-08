@@ -4,6 +4,7 @@ const MessageStatus = require('../../models/MessageStatus');
 const Contact = require('../../models/Contact');
 const User = require('../../models/User');
 const MessageCacheService = require('../../services/messageCacheService');
+const messageNotifications = require('../../services/messageNotifications');
 const logger = require('../../utils/logger');
 const { isValidUUID } = require('../../utils/validators');
 const { checkRateLimit } = require('../../utils/rateLimiter');
@@ -404,6 +405,15 @@ async function handleMessageSend(io, socket, data) {
       tempId,
       messageId: message.id,
       createdAt: message.created_at,
+    });
+
+    // Push/email notifications outside the app. Not awaited (it never throws),
+    // so a slow email provider cannot hold up messaging.
+    messageNotifications.onMessageSent({
+      message,
+      conversationId,
+      senderId: userId,
+      recipientIds,
     });
 
     logger.info('Message sent', {

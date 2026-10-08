@@ -41,7 +41,10 @@ const getExecutedMigrations = async () => {
 const getMigrationFiles = async () => {
   try {
     const files = await fs.readdir(MIGRATIONS_DIR);
-    return files.filter(file => file.endsWith('.sql')).sort(); // Sort alphabetically (001, 002, etc.)
+    // Rollback scripts live beside some migrations; running them would undo the migration
+    return files
+      .filter(file => file.endsWith('.sql') && !file.endsWith('_rollback.sql'))
+      .sort(); // Sort alphabetically (001, 002, etc.)
   } catch (err) {
     console.error('Error reading migrations directory:', err.message);
     throw err;

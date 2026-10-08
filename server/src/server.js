@@ -3,6 +3,7 @@ const http = require('http');
 const app = require('./app');
 const { initializeBucket } = require('./config/storage');
 const { connectRedis } = require('./config/redis');
+const { startReminderSweep, stopReminderSweep } = require('./services/messageNotifications');
 const { initializeSocket } = require('./socket');
 const logger = require('./utils/logger');
 
@@ -43,6 +44,9 @@ async function startServer() {
       console.log(`Health check: http://localhost:${PORT}/health`);
     });
 
+    // Remind the owner about visitors who are still waiting for a reply
+    startReminderSweep();
+
     // Graceful shutdown handlers
     setupShutdownHandlers(httpServer, io);
   } catch (error) {
@@ -62,6 +66,7 @@ function setupShutdownHandlers(server, io) {
       return;
     }
     isShuttingDown = true;
+    stopReminderSweep();
 
     console.log(`\n${signal} received, shutting down gracefully...`);
     logger.info(`${signal} received, initiating graceful shutdown`);
