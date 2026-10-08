@@ -2,7 +2,11 @@
 
 > A production-ready MVP messaging platform with real-time communication, contact management, and extensible architecture
 
-**Status**: Week 9 Day 1-2 NEXT | Backend Complete with 720 tests (716 passing, 4 skipped) - 99.4% pass rate
+**Status**: Week 9 Day 3-4 NEXT (auth pages written, chat UI still placeholders) | Backend Complete with 720 tests (716 passing, 4 skipped) - 99.4% pass rate
+
+**Goal**: A portfolio visitor can open the site, message the owner, and the owner gets notified.
+
+**Critical path to the goal (~12-15 hours)**: Week 9 → Week 19 → Week 10. Weeks 11-18 are optional extras and do not block launch.
 
 ---
 
@@ -208,19 +212,25 @@
 ### Week 9: Minimal Viable Frontend (5 hours) - NEXT
 
 **Day 1-2: React Setup & Authentication (2.5 hours)**
-- [ ] Create React app with Vite
-- [ ] Install: react-router-dom, axios, socket.io-client
-- [ ] Login/Register pages
-- [ ] AuthContext for token management
-- [ ] Axios interceptor for JWT tokens
-- [ ] Protected route wrapper
+- [x] Create React app with Vite
+- [x] Install: react-router-dom, axios, socket.io-client
+- [x] Login/Register pages
+- [x] AuthContext for token management
+- [x] Axios interceptor for JWT tokens
+- [x] Protected route wrapper
+- [ ] Fix: `AuthContext.jsx` uses `logout` in `startTokenRefresh` deps (line 85) before it is declared (line 145) - move `logout` above it
+- [ ] Fix: AuthContext refresh paths should save a rotated refresh token like the Axios interceptor does
 
 **Day 3-4: Chat Interface Foundation (2.5 hours)**
-- [ ] Sidebar with conversation list
-- [ ] Chat window with message list + input
-- [ ] Socket.io connection in SocketContext
+- [ ] Sidebar with conversation list (fetch GET /api/conversations; currently a placeholder)
+- [ ] Active-conversation state shared by Sidebar and ChatWindow
+- [ ] Chat window with message list + input (load history, emit `conversation:join`)
+- [x] Socket.io connection in SocketContext
+- [ ] Send with `message:send` + tempId; handle `message:sent`, `message:new`, `message:error`
 - [ ] Real-time message display
-- [ ] Basic styling with plain CSS
+- [ ] Fix: pass socket `auth` as a function reading the current access token (reconnect after 15 min fails with the stale one)
+- [ ] Fix: empty-state copy "Start chatting with your contacts!" does not fit a visitor
+- [x] Basic styling with plain CSS
 
 **Milestone 8**: Basic UI functional
 
@@ -243,10 +253,21 @@
 - [ ] Fix: move refresh token from localStorage to httpOnly cookie (XSS mitigation)
 
 **Day 4-5: Deployment (1.5 hours)**
-- [ ] Docker setup (server + client Dockerfiles)
-- [ ] Nginx configuration
-- [ ] Deploy to Railway.app ($5/month)
-- [ ] SSL certificate setup
+Deploy prep (code changes):
+- [ ] Express serves `client/dist` with SPA fallback (single service, same origin - replaces Nginx + separate client Dockerfile)
+- [ ] `config/database.js`: support `DATABASE_URL` + SSL, raise 2s connect timeout, stop logging every query text
+- [ ] `app.set('trust proxy', 1)` so rate limits use the real client IP (register limit is 3/hour per IP)
+- [ ] Make MinIO optional: `initializeBucket()` failure must not exit the server
+- [ ] Migrations: runner must skip `*_rollback.sql` files; resolve missing 003, 004, 014-016; verify a clean run on an empty database
+- [ ] Remove hardcoded credentials from `docker-compose.yml` for anything production-facing
+
+Deploy:
+- [ ] One Dockerfile (or Nixpacks) building client then running server
+- [ ] Railway.app: app service + Postgres plugin + Redis plugin (~$5/month); HTTPS is provided, no SSL setup needed
+- [ ] Env vars: `NODE_ENV`, `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CLIENT_URL`, `OWNER_USER_ID`, `NTFY_TOPIC`, `RESEND_API_KEY`, `OWNER_EMAIL`
+- [ ] Run `npm run migrate` as release command
+- [ ] Register owner account on the live site, set `OWNER_USER_ID`, redeploy
+- [ ] Smoke test from a phone in incognito: register, send message, confirm push + email + reminder
 
 **Milestone 9**: Production deployment complete
 
@@ -383,6 +404,8 @@
 
 ### Week 17: Group Enhancements (7 hours) - PENDING
 
+> Note: overlaps Week 12 (edit history, group typing, read receipts) and Week 13 Day 4-5 (mentions). Only the items not finished there remain: diff view, ZSET typing, expandable "Read by X" list.
+
 **Day 1-2: Full Edit History (2.5 hours)**
 - [ ] message_edit_history table and UI
 - [ ] Diff view for changes
@@ -429,21 +452,25 @@
 - [ ] PUT /api/conversations/:id/mute|archive
 - [ ] GET /api/conversations?archived=true
 
-**Day 6: Last Admin Protection (1 hour)**
-- [ ] Prevent removing last admin
-- [ ] Auto-promote oldest member
+**Day 6: Last Admin Protection (1 hour)** - already done in Week 8 Day 1-2
+- [x] Prevent removing last admin
+- [x] Auto-promote oldest member
 
 **Milestone 17**: All Week 7-8 deferred features implemented
 
 ---
 
-### Week 19: Owner Notification System (2 hours) - PENDING
+### Week 19: Owner Notification System (3 hours) - PENDING - DO RIGHT AFTER WEEK 9, BEFORE DEPLOYING
+
+> Not started: only the design doc `.claude/New_Feature.md` exists. No `ownerService.js` or `notificationService.js` in the code yet.
 
 **Day 1: Auto-Conversation on Registration (1 hour)**
 - [ ] Create `src/services/ownerService.js` with `createAutoConversationWithOwner()`
 - [ ] Hook into `POST /api/auth/register` (fire-and-forget, idempotent)
 - [ ] Add `OWNER_USER_ID` to `.env`
-- [ ] New user sees owner in sidebar immediately after signup
+- [ ] New user sees owner in sidebar immediately after signup, with that conversation auto-selected
+- [ ] Also add contact rows both ways on registration (presence only broadcasts to contacts, so visitors would never see the owner online)
+- [ ] Decide: keep full registration for visitors, or add a one-click guest entry (~2 hours extra)
 
 **Day 2: Push & Email Notifications (1 hour)**
 - [ ] Install `resend` package (`npm install resend`)
@@ -453,9 +480,9 @@
 - [ ] Only fire on first message per conversation (configurable)
 - [ ] Set up ntfy app on phone + Resend account (free tier, 3k emails/month)
 - [ ] Schedule follow-up reminder if owner hasn't replied within 90 minutes
-  - [ ] Store pending reminder in Redis with 90-min TTL (`reminder:conv:{conversationId}`)
-  - [ ] On owner reply, cancel the reminder (delete Redis key)
-  - [ ] Use `setTimeout` or a lightweight job (e.g. `node-cron` / `bullmq`) to fire reminder at TTL expiry
+  - [ ] Store pending reminder in a Redis sorted set (`reminders:pending`, score = due time, member = conversationId)
+  - [ ] On owner reply, cancel the reminder (remove from the sorted set)
+  - [ ] Sweep the set every 60s with `setInterval` and fire due reminders (a Redis TTL expiring triggers nothing by itself, and `setTimeout` is lost on every redeploy)
   - [ ] Reminder notification: "You haven't replied to {username} yet — they messaged 90 min ago"
 
 **Notification Flow**
@@ -463,11 +490,11 @@
 Guest sends message → Is recipient OWNER_USER_ID?
   NO  → skip
   YES → Fire ntfy push + Resend email immediately
-        Set Redis key: reminder:conv:{id} TTL=90min
+        Add to Redis sorted set reminders:pending (due = now + 90min)
               │
         Owner replies within 90min?
-          YES → delete Redis key (no reminder)
-          NO  → TTL expires → fire reminder push + email
+          YES → remove from sorted set (no reminder)
+          NO  → 60s sweep finds it due → fire reminder push + email
 ```
 
 **Milestone 18**: Owner gets instant push + email when a portfolio visitor messages them, plus a follow-up reminder if unanswered after 90 minutes
