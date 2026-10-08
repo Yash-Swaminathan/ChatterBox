@@ -22,4 +22,5 @@ USER node
 EXPOSE 3000
 
 # Apply any pending migrations, then start. The platform sets PORT.
-CMD ["sh", "-c", "node src/database/migrate.js run && node src/server.js"]
+# exec: the server replaces the shell, so it receives the stop signal directly.
+CMD ["sh", "-c", "node src/database/migrate.js run && exec node src/server.js"]

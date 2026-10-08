@@ -149,14 +149,14 @@ function chatReducer(state, action) {
       };
 
     case 'PRESENCE_SYNCED':
-      // The server lists everyone who is not offline, so anyone missing is offline
+      // Sent on connect, and only covers contacts who are not offline. People missing
+      // from it keep the status from the conversation list, which is fetched on every connect.
       return {
         ...state,
-        conversations: state.conversations.map((c) =>
-          c.otherUser
-            ? { ...c, status: action.presences[c.otherUser.userId]?.status || 'offline' }
-            : c
-        ),
+        conversations: state.conversations.map((c) => {
+          const presence = c.otherUser && action.presences[c.otherUser.userId];
+          return presence ? { ...c, status: presence.status } : c;
+        }),
       };
 
     case 'MESSAGES_LOADING': {
