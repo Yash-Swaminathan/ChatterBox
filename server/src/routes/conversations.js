@@ -11,6 +11,7 @@ const {
   validateGroupSettings,
   validateRoleUpdate,
 } = require('../middleware/validation');
+const { requireOwnerInOwnerOnlyMode, requireReachableTarget } = require('../middleware/ownerOnly');
 const rateLimit = require('express-rate-limit');
 
 // More granular control for rate limiting in tests
@@ -43,6 +44,7 @@ router.post(
   requireAuth,
   createConversationLimiter,
   validateCreateDirectConversation,
+  requireReachableTarget(req => req.body.participantId),
   conversationController.createDirectConversation
 );
 
@@ -52,6 +54,7 @@ router.post(
   requireAuth,
   createConversationLimiter, // Reuse existing rate limiter (60 req/min)
   validateCreateGroupConversation,
+  requireOwnerInOwnerOnlyMode,
   conversationController.createGroupConversation
 );
 
@@ -82,6 +85,7 @@ router.post(
   requireAuth,
   validateUUID('conversationId'),
   requireAdmin, // Must be admin to add participants
+  requireOwnerInOwnerOnlyMode,
   validateAddParticipants(),
   createConversationLimiter, // Reuse existing limiter (60 req/min)
   conversationController.addParticipants

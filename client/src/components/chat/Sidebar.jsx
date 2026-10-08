@@ -1,8 +1,10 @@
 import { useAuth } from '../../hooks/useAuth';
+import { useSocket } from '../../hooks/useSocket';
 import { ConversationList } from './ConversationList';
 
 export function Sidebar() {
   const { user, logout } = useAuth();
+  const { connected } = useSocket();
 
   return (
     <div className="sidebar">
@@ -19,7 +21,9 @@ export function Sidebar() {
           </div>
           <div className="user-details">
             <h3>{user?.displayName || user?.username}</h3>
-            <span className="status">{user?.status || 'online'}</span>
+            <span className={`status ${connected ? '' : 'status-offline'}`}>
+              {connected ? 'Online' : 'Connecting...'}
+            </span>
           </div>
         </div>
         <button onClick={logout} className="logout-btn" title="Logout">

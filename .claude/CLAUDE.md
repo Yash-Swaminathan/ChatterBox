@@ -2,13 +2,17 @@
 
 > A production-ready MVP messaging platform with real-time communication, contact management, and extensible architecture
 
-**Status**: Week 9 Day 1-2 NEXT | Backend Complete with 720 tests (716 passing, 4 skipped) - 99.4% pass rate
+**Status**: Week 10 NEXT (Week 9 complete: working chat UI, live delivery, owner-only lockdown) | 750 server tests
+
+**Goal**: A portfolio visitor can open the site, message the owner, and the owner gets notified.
+
+**Critical path to the goal (~11 hours left)**: Week 10 (notifications + password reset) → Week 11 (polish + deploy). Week 12 and the backlog come after launch.
 
 ---
 
 ## Table of Contents
 
-1. [Week 1-18 Plan](#week-1-18-plan)
+1. [Week 1-12 Plan](#week-1-12-plan)
 2. [Overall Progress Summary](#overall-progress-summary)
 3. [Feature Deferral Tracking](#feature-deferral-tracking)
 4. [API Design](#api-design)
@@ -20,7 +24,7 @@
 
 ---
 
-## Week 1-18 Plan
+## Week 1-12 Plan
 
 ### Week 1: Project Setup & Authentication (7 hours) - COMPLETED
 
@@ -205,271 +209,167 @@
 
 ---
 
-### Week 9: Minimal Viable Frontend (5 hours) - NEXT
+> **Plan revised 2026-10-08.** Weeks 9-12 below are the critical path to the goal. The original Weeks 11-18 are kept as an optional backlog at the end. Design details: `.claude/Week9_Design.md`.
 
-**Day 1-2: React Setup & Authentication (2.5 hours)**
-- [ ] Create React app with Vite
-- [ ] Install: react-router-dom, axios, socket.io-client
-- [ ] Login/Register pages
-- [ ] AuthContext for token management
-- [ ] Axios interceptor for JWT tokens
-- [ ] Protected route wrapper
+### Product rules (apply to everything below)
 
-**Day 3-4: Chat Interface Foundation (2.5 hours)**
-- [ ] Sidebar with conversation list
-- [ ] Chat window with message list + input
-- [ ] Socket.io connection in SocketContext
-- [ ] Real-time message display
-- [ ] Basic styling with plain CSS
-
-**Milestone 8**: Basic UI functional
+- Everyone can always message the owner. A conversation with the owner is created automatically at signup.
+- Nobody can message a stranger. Users other than the owner can only connect by sending a request to an exact username, and can only message after it is accepted (Week 12).
+- No browsing or partial search of users for non-owners. Emails are never returned for other users.
+- Both sides get notified: the owner on a visitor's message, the visitor by email when the owner replies.
+- This is a small portfolio app: no captcha, single server instance.
 
 ---
 
-### Week 10: Frontend Completion & Deployment (5 hours) - PENDING
+### Week 9: Working Chat UI + Privacy Lockdown (7-8 hours) - COMPLETED
 
-**Day 1-2: Group Chats UI (2 hours)**
-- [ ] "Create Group" button + modal
-- [ ] Group settings modal (add/remove members)
-- [ ] Admin-only UI elements
+**Day 1-2: React Setup & Authentication** - COMPLETED
+- [x] Create React app with Vite; react-router-dom, axios, socket.io-client
+- [x] Login/Register pages, AuthContext, Axios interceptor, protected routes
 
-**Day 3: Polish & Bug Fixes (1.5 hours)**
-- [ ] Message timestamps + online/offline indicators
-- [ ] Scroll to bottom on new message
-- [ ] Loading states + error messages
-- [ ] Mobile responsive (basic)
-- [ ] Fix: stale refresh token in AuthContext interval (read from storage each tick)
-- [ ] Fix: SocketContext cleanup should disconnect unconditionally on unmount
-- [ ] Fix: move refresh token from localStorage to httpOnly cookie (XSS mitigation)
+**Day 3: Client fixes (0.5 hours)**
+- [x] `AuthContext.jsx`: declare `logout` before `startTokenRefresh` (crash on first render)
+- [x] `AuthContext.jsx`: save a rotated refresh token in init and interval paths
+- [x] `SocketContext.jsx`: pass `auth` as a function reading the current access token
+- [x] `SocketContext.jsx`: emit `heartbeat` every 25s (presence expires after 60s without it)
 
-**Day 4-5: Deployment (1.5 hours)**
-- [ ] Docker setup (server + client Dockerfiles)
-- [ ] Nginx configuration
-- [ ] Deploy to Railway.app ($5/month)
-- [ ] SSL certificate setup
+**Day 4-5: Chat UI (3.5 hours)**
+- [x] `conversations.api.js`, `messages.api.js`, `utils/normalize.js`
+- [x] `ChatContext` + `useChat`: conversations, active conversation, messages, unread counts
+- [x] Sidebar list from GET /api/conversations; selecting a conversation; auto-select when there is only one
+- [x] History from GET /api/messages/conversations/:id (reverse newest-first, "Load earlier" button)
+- [x] Optimistic send with tempId; handle `message:new`, `message:sent`, `message:error` with retry
+- [x] Unread badges (GET /api/messages/unread + live), `message:read` on open
+- [x] Reconnect: refetch and merge without dropping pending messages
+- [x] Scroll to bottom on new message; visitor-appropriate empty states
 
-**Milestone 9**: Production deployment complete
+**Day 6: Server - live delivery (1 hour)**
+- [x] On socket connect, join the socket to all of the user's `conversation:{id}` rooms
+- [x] When a conversation is created or a participant added, join that user's online sockets to the room
+- [x] Emit `conversation:new` to participants' user rooms so sidebars update live
 
----
+**Day 7: Server - owner-only lockdown, Phase A (2 hours)**
+- [x] `OWNER_USER_ID` + `OWNER_ONLY_MODE` env vars (flag off = current behaviour, existing tests unchanged)
+- [x] `ownerService.js`: `isOwner()`, `createAutoConversationWithOwner()`; hook into register (fire-and-forget, idempotent)
+- [x] With flag on, for non-owners: user search refused; profile fetch only for self or owner; direct conversation and add-contact only with owner; group creation and add-participants refused
+- [x] Remove `email` from participants in GET /api/conversations
+- [x] Tests for flag-on paths
+- [x] Registration also adds contact rows both ways with the owner (presence is only broadcast to contacts)
 
-### Week 11: Frontend Feature Completion (5 hours) - PENDING
+**Bugs found and fixed while verifying against a running server** (hidden before because tests mock these)
+- [x] `User.findById` did not exist, so POST /api/conversations/direct and POST /api/contacts always returned 500
+- [x] The shared Redis client was never connected at startup, so presence, unread counts and the message cache silently did nothing
 
-**Day 1-2: Typing Indicators & Read Receipts UI (2 hours)**
-- [ ] "User is typing..." display with animation
-- [ ] Message status icons: ✓ (sent), ✓✓ (delivered/read)
-- [ ] Privacy settings toggle
-
-**Day 3: Avatar & File Upload UI (1.5 hours)**
-- [ ] Display user avatars in conversation/message lists
-- [ ] File attachment button with preview
-- [ ] Progress indicators
-
-**Day 4-5: Material-UI Integration (1.5 hours)**
-- [ ] Install @mui/material
-- [ ] Theme file with color palette
-- [ ] Replace components with MUI
-- [ ] Responsive layout
-
-**Milestone 10**: Feature-complete frontend
+**Milestone 8**: A visitor registers, lands in a chat with the owner, and both sides see messages live. Visitors cannot see or reach each other.
 
 ---
 
-### Week 12: Backend Feature Completion (5 hours) - PENDING
+### Week 10: Notifications & Password Reset (5 hours) - PENDING
 
-**Day 1-2: Full Edit History (2 hours)**
-- [ ] Create message_edit_history table
-- [ ] Store previous content before editing
-- [ ] GET /api/messages/:messageId/history endpoint
+**Day 1: Owner notifications (1.5 hours)**
+- [ ] `npm install resend`; `notificationService.js` with ntfy.sh push + Resend email (HTML-escaped)
+- [ ] Env: `NTFY_TOPIC`, `RESEND_API_KEY`, `OWNER_EMAIL`, `EMAIL_FROM`, `APP_URL`
+- [ ] Hook into `message:send`: notify when a recipient is the owner and the owner is offline or it is the first message of the conversation
+- [ ] Cap: at most one notification per conversation per 10 minutes, and 30 per hour overall
+- [ ] Set up ntfy app on phone + Resend account with a verified sender
 
-**Day 3: Enhanced Typing for Groups (1.5 hours)**
-- [ ] Redis-based typing state
-- [ ] Aggregate: "Alice, Bob, and 2 others are typing..."
-- [ ] Batch typing updates
+**Day 2: Owner reminder (1 hour)**
+- [ ] Redis sorted set `reminders:pending` (score = due time, member = conversationId), added on visitor message
+- [ ] Removed when the owner replies
+- [ ] 60s `setInterval` sweep fires due reminders: "You haven't replied to {username} yet - they messaged 90 min ago"
 
-**Day 4-5: Group Read Receipts (1.5 hours)**
-- [ ] GET /api/messages/:messageId/read-by endpoint
-- [ ] Aggregate read receipts for groups
-- [ ] "Read by Alice, Bob, and 3 others" UI
+**Day 3: Visitor reply email (1 hour)**
+- [ ] When the owner sends a message and the recipient has no active socket, email the recipient: "{owner} replied to you" with a link back
+- [ ] At most one email per conversation per 30 minutes
+- [ ] `users.email_notifications` column (default true) + unsubscribe link in the email
 
-**Milestone 11**: All deferred backend features implemented
-
----
-
-### Week 13: File Attachments & Mentions (5 hours) - PENDING
-
-**Day 1-2: File Attachments Backend (2.5 hours)**
-- [ ] Extend Multer for documents, videos, audio
-- [ ] POST /api/upload/attachment endpoint
-- [ ] Server-side thumbnail generation (sharp, ffmpeg)
-- [ ] GET /api/files/:fileId (authenticated download)
-
-**Day 3: File Attachments Frontend (1 hour)**
-- [ ] Drag & drop file upload
-- [ ] Image thumbnails and lightbox
-- [ ] File download links
-
-**Day 4-5: Enhanced Message Mentions (1.5 hours)**
-- [ ] Create message_mentions table
-- [ ] GET /api/messages/mentions endpoint
-- [ ] Mention autocomplete UI
-- [ ] Mention highlighting
-
-**Milestone 12**: Full-featured messaging with files and enhanced mentions
-
----
-
-### Week 14: Performance Optimization (5 hours) - PENDING
-
-**Day 1-2: Database Optimization (2 hours)**
-- [ ] Analyze slow queries with EXPLAIN ANALYZE
-- [ ] Add missing indexes
-- [ ] Query result caching expansion
-
-**Day 3: Redis Caching Expansion (1.5 hours)**
-- [ ] Cache conversation participant lists
-- [ ] Cache warming on server startup
-- [ ] Monitor cache hit rate (>80% target)
-
-**Day 4-5: Load Testing & Monitoring (1.5 hours)**
-- [ ] K6 load tests (1000 concurrent users)
-- [ ] Sentry free tier for error tracking
-- [ ] Winston logs with daily rotation
-
-**Milestone 13**: Performance optimization complete
-
----
-
-### Week 15: Message Reactions & Forwarding (5 hours) - PENDING
-
-**Day 1-2: Message Reactions (2.5 hours)**
-- [ ] Create message_reactions table
-- [ ] POST /api/messages/:messageId/reactions
-- [ ] Socket event: message:reaction-added
-- [ ] Emoji picker UI
-
-**Day 3: Message Forwarding (1.5 hours)**
-- [ ] POST /api/messages/:messageId/forward
-- [ ] Forward to multiple conversations
-
-**Day 4-5: Pinned Messages (1 hour)**
-- [ ] PUT /api/conversations/:id/pin/:messageId
-- [ ] Pinned messages banner UI
-
-**Milestone 14**: Advanced messaging features complete
-
----
-
-### Week 16: Voice Messages (5 hours) - PENDING
-
-**Day 1-2: Voice Recording Infrastructure (2.5 hours)**
-- [ ] Voice recording component (max 2 minutes)
-- [ ] Client-side audio compression
-- [ ] POST /api/upload/voice endpoint
-- [ ] Server-side waveform generation
-
-**Day 3: Voice Playback (1.5 hours)**
-- [ ] Voice message player component
-- [ ] Waveform visualization
-- [ ] Speed control (1x, 1.5x, 2x)
-
-**Day 4-5: Final Polish (1 hour)**
-- [ ] Bug fixes from production
-- [ ] Update README and documentation
-- [ ] Portfolio preparation
-
-**Milestone 15**: Week 16 feature-complete
-
----
-
-### Week 17: Group Enhancements (7 hours) - PENDING
-
-**Day 1-2: Full Edit History (2.5 hours)**
-- [ ] message_edit_history table and UI
-- [ ] Diff view for changes
-
-**Day 3: Enhanced Typing for Groups (1.5 hours)**
-- [ ] Redis-based typing with ZSET
-- [ ] "Several people are typing" when >5 users
-
-**Day 4: Group Read Receipts Aggregation (1.5 hours)**
-- [ ] GET /api/messages/:messageId/read-by
-- [ ] "Read by X" expandable list
-
-**Day 5-7: Enhanced Message Mentions (1.5 hours)**
-- [ ] message_mentions table
-- [ ] Mention autocomplete and highlighting
-
-**Milestone 16**: Group messaging feature-complete
-
----
-
-### Week 18: Contact Requests & Permissions (8 hours) - PENDING
-
-**Day 1: Contact Request Model (1 hour)**
-- [ ] contact_requests table
-- [ ] ContactRequest.js model (8 methods)
-
-**Day 2: Contact Request Endpoints (1.5 hours)**
-- [ ] POST /api/contact-requests
-- [ ] GET /api/contact-requests?type=received|sent
-- [ ] PUT /api/contact-requests/:id/accept|reject
-- [ ] Socket events for notifications
-
-**Day 3: Group Invite Links (2 hours)**
-- [ ] group_invites table
-- [ ] POST /api/conversations/:id/invites
-- [ ] POST /api/invites/:code/join
-
-**Day 4: Group Permissions (1.5 hours)**
-- [ ] group_permissions table
-- [ ] PUT /api/conversations/:id/permissions
-- [ ] checkGroupPermission() middleware
-
-**Day 5: Muting & Archiving (1 hour)**
-- [ ] PUT /api/conversations/:id/mute|archive
-- [ ] GET /api/conversations?archived=true
-
-**Day 6: Last Admin Protection (1 hour)**
-- [ ] Prevent removing last admin
-- [ ] Auto-promote oldest member
-
-**Milestone 17**: All Week 7-8 deferred features implemented
-
----
-
-### Week 19: Owner Notification System (2 hours) - PENDING
-
-**Day 1: Auto-Conversation on Registration (1 hour)**
-- [ ] Create `src/services/ownerService.js` with `createAutoConversationWithOwner()`
-- [ ] Hook into `POST /api/auth/register` (fire-and-forget, idempotent)
-- [ ] Add `OWNER_USER_ID` to `.env`
-- [ ] New user sees owner in sidebar immediately after signup
-
-**Day 2: Push & Email Notifications (1 hour)**
-- [ ] Install `resend` package (`npm install resend`)
-- [ ] Create `src/services/notificationService.js` with ntfy.sh push + Resend email
-- [ ] Add `NTFY_TOPIC`, `RESEND_API_KEY`, `OWNER_EMAIL` to `.env`
-- [ ] Hook into `message:send` socket handler — notify only when recipient is owner
-- [ ] Only fire on first message per conversation (configurable)
-- [ ] Set up ntfy app on phone + Resend account (free tier, 3k emails/month)
-- [ ] Schedule follow-up reminder if owner hasn't replied within 90 minutes
-  - [ ] Store pending reminder in Redis with 90-min TTL (`reminder:conv:{conversationId}`)
-  - [ ] On owner reply, cancel the reminder (delete Redis key)
-  - [ ] Use `setTimeout` or a lightweight job (e.g. `node-cron` / `bullmq`) to fire reminder at TTL expiry
-  - [ ] Reminder notification: "You haven't replied to {username} yet — they messaged 90 min ago"
+**Day 4-5: Password reset (1.5 hours)**
+- [ ] `password_resets` table: user_id, token_hash, expires_at (30 min), used_at
+- [ ] POST /api/auth/forgot-password { email }: always returns 200; rate limited (3/hour per IP and per email); emails a single-use link
+- [ ] POST /api/auth/reset-password { token, password }: sets password, marks token used, revokes all sessions
+- [ ] Client: "Forgot password?" link, forgot-password page, reset-password page
+- [ ] Tests
 
 **Notification Flow**
 ```
-Guest sends message → Is recipient OWNER_USER_ID?
-  NO  → skip
-  YES → Fire ntfy push + Resend email immediately
-        Set Redis key: reminder:conv:{id} TTL=90min
+Visitor sends message → recipient is OWNER_USER_ID?
+  YES → push + email to owner (within caps)
+        add conversation to reminders:pending (due = now + 90min)
               │
         Owner replies within 90min?
-          YES → delete Redis key (no reminder)
-          NO  → TTL expires → fire reminder push + email
+          YES → remove from reminders:pending
+                visitor offline? → email visitor (max 1 per 30min)
+          NO  → 60s sweep finds it due → reminder push + email
 ```
 
-**Milestone 18**: Owner gets instant push + email when a portfolio visitor messages them, plus a follow-up reminder if unanswered after 90 minutes
+**Milestone 9**: Owner gets push + email on a visitor's message and a reminder if unanswered; visitors get an email when the owner replies; forgotten passwords can be reset.
+
+---
+
+### Week 11: Polish & Deployment (6 hours) - PENDING
+
+**Day 1-2: Polish (2 hours)**
+- [ ] Online/offline indicator for the other participant (`presence:changed`, `presence:bulk`)
+- [ ] `lastMessage` in GET /api/conversations so sidebar previews survive a refresh
+- [ ] Loading and error states; mobile layout (sidebar/chat toggle)
+- [ ] Move refresh token from localStorage to httpOnly cookie (same origin after deploy makes this simple)
+
+**Day 3: Deploy prep (2 hours)**
+- [ ] Express serves `client/dist` with SPA fallback (single service, same origin; no Nginx)
+- [ ] `config/database.js`: `DATABASE_URL` + SSL, longer connect timeout, stop logging every query text
+- [ ] `app.set('trust proxy', 1)` so rate limits use the real client IP
+- [ ] Make MinIO optional: `initializeBucket()` failure must not exit the server
+- [ ] Migrations: runner skips `*_rollback.sql`; resolve missing 003, 004, 014-016; verify a clean run on an empty database
+- [ ] Remove hardcoded credentials from anything production-facing
+- [ ] `messageCacheService` calls `redisClient.zRevRange`, which does not exist in node-redis v5: every cache read errors and falls back to the database. Switch to `zRange(..., { REV: true })` and test the cached path
+- [ ] Local dev database has no `contacts` table (the runner executed the rollback files); rebuild it once the runner is fixed
+- [ ] `socket.integration.spec.js` hardcodes port 3001 and fails when that port is in use; use an ephemeral port
+- [ ] Add a favicon (the browser's default request 404s)
+
+**Day 4-5: Deploy (2 hours)**
+- [ ] One Dockerfile (or Nixpacks) building client then running server
+- [ ] Railway.app: app service + Postgres plugin + Redis plugin (~$5/month); HTTPS is provided
+- [ ] Env vars: `NODE_ENV`, `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CLIENT_URL`, `APP_URL`, `OWNER_USER_ID`, `OWNER_ONLY_MODE=true`, `NTFY_TOPIC`, `RESEND_API_KEY`, `OWNER_EMAIL`, `EMAIL_FROM`
+- [ ] `npm run migrate` as release command
+- [ ] Register the owner account on the live site, set `OWNER_USER_ID`, redeploy
+- [ ] Smoke test from a phone in incognito: register, send a message, confirm push + email + reminder + visitor reply email + password reset
+
+**Milestone 10**: Live on the internet; the goal is met.
+
+---
+
+### Week 12: Connection Requests, Phase B (4 hours) - PENDING (after launch)
+
+- [ ] `contact_requests` table: sender_id, recipient_id, status (pending|accepted|rejected), created_at, responded_at; unique per pair
+- [ ] POST /api/contact-requests { username }: exact username only; same response whether or not the user exists; 10 per day; a rejected request cannot be re-sent for 30 days
+- [ ] GET /api/contact-requests?type=received|sent; PUT /api/contact-requests/:id/accept|reject
+- [ ] Accepting creates contact rows both ways and the direct conversation
+- [ ] Lockdown rule becomes "owner or accepted connection" for direct conversations, profiles and group membership
+- [ ] Socket events: `contact-request:received`, `contact-request:accepted`
+- [ ] Client: "Add by username" field and a requests inbox with accept/reject
+- [ ] Tests
+
+**Milestone 11**: Users can talk to each other, but only by mutual consent.
+
+---
+
+### Optional Backlog (not required for the goal)
+
+Pick from these after launch; each is independent.
+
+| Feature | Notes | Estimate |
+|---|---|---|
+| Group chats UI | Create-group modal, settings modal, admin-only controls (backend exists) | 2 h |
+| Typing indicators | Redis-backed state, "Alice is typing...", aggregate for groups | 2.5 h |
+| Read receipt UI | ✓ / ✓✓ icons, privacy toggle, "Read by X" list for groups | 2.5 h |
+| Avatars and file attachments | Avatar display, upload endpoint for documents/media, thumbnails, drag and drop | 5 h |
+| Edit history | `message_edit_history` table, history endpoint, diff view | 2.5 h |
+| Mentions | `message_mentions` table, autocomplete, highlighting | 2 h |
+| Reactions, forwarding, pinned messages | New tables and endpoints, emoji picker | 5 h |
+| Voice messages | Recorder, upload endpoint, waveform player | 4 h |
+| Material-UI restyle | Theme + component swap | 1.5 h |
+| Performance | EXPLAIN ANALYZE pass, cache participant lists, K6 at 1000 users, Sentry, log rotation | 5 h |
+| Group invite links, group permissions, mute/archive | Remaining Week 18 items (last-admin protection is already done) | 4.5 h |
+| One-click guest entry | Skip registration for visitors | 2 h |
 
 ---

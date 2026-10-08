@@ -1,18 +1,19 @@
 import { useState } from 'react';
-import { useSocket } from '../../hooks/useSocket';
+import { useChat } from '../../hooks/useChat';
+
+// Matches the server-side limit on message length
+const MAX_MESSAGE_LENGTH = 10000;
 
 export function MessageInput() {
   const [message, setMessage] = useState('');
-  const { emit, connected } = useSocket();
+  const { sendMessage, connected } = useChat();
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!message.trim() || !connected) return;
 
-    // TODO: Implement message sending in Week 9 Day 3-4
-    // emit('message:send', { conversationId, content: message, tempId: uuid() });
-
+    sendMessage(message);
     setMessage('');
   };
 
@@ -24,7 +25,9 @@ export function MessageInput() {
         onChange={(e) => setMessage(e.target.value)}
         placeholder={connected ? "Type a message..." : "Connecting..."}
         disabled={!connected}
+        maxLength={MAX_MESSAGE_LENGTH}
         className="message-input"
+        autoFocus
       />
       <button
         type="submit"

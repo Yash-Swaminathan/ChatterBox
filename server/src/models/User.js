@@ -713,6 +713,8 @@ async function findByIds(userIds) {
 
 module.exports = {
   getUserById,
+  // Controllers look users up as User.findById
+  findById: getUserById,
   getPublicUserById,
   getPublicUserProfile,
   updateUserProfile,

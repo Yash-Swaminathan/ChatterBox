@@ -1,16 +1,20 @@
+import { useChat } from '../../hooks/useChat';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 
 export function ChatWindow() {
-  // TODO: Get active conversation from state in Week 9 Day 3-4
-  const activeConversation = null;
+  const { activeConversation, conversations, loading, connected } = useChat();
 
   if (!activeConversation) {
     return (
       <div className="chat-window-empty">
         <div className="empty-state">
           <h2>Welcome to ChatterBox</h2>
-          <p>Select a conversation to start chatting</p>
+          <p>
+            {loading || conversations.length > 0
+              ? 'Select a conversation to start chatting'
+              : 'Your conversations will appear here'}
+          </p>
         </div>
       </div>
     );
@@ -21,7 +25,7 @@ export function ChatWindow() {
       <div className="chat-header">
         <div className="chat-header-info">
           <h3>{activeConversation.name}</h3>
-          <span className="chat-status">online</span>
+          {!connected && <span className="chat-connection">Reconnecting...</span>}
         </div>
       </div>
 

@@ -3,6 +3,10 @@ const User = require('../models/User');
 const { pool } = require('../config/database');
 const { getBulkPresence } = require('../services/presenceService');
 const logger = require('../utils/logger');
+const {
+  joinUsersToConversation,
+  removeUserFromConversation,
+} = require('../socket/conversationRooms');
 
 /**
  * Create or get a direct conversation between two users
@@ -35,6 +39,11 @@ async function createDirectConversation(req, res) {
       currentUserId,
       participantId
     );
+
+    // Put both users' open sessions in the room so they receive messages straight away
+    if (created) {
+      joinUsersToConversation(req.app.get('io'), conversation.id, [currentUserId, participantId]);
+    }
 
     // Fetch full conversation details with participants
     const fullConversation = await Conversation.findById(conversation.id, currentUserId);
@@ -193,6 +202,8 @@ async function createGroupConversation(req, res) {
       name,
       avatarUrl,
     });
+
+    joinUsersToConversation(req.app.get('io'), conversation.id, finalParticipantIds);
 
     // 4. Fetch full conversation details with participants
     const fullConversation = await Conversation.findById(conversation.id);
@@ -461,6 +472,7 @@ async function addParticipants(req, res) {
     // Emit Socket.io event to conversation room
     const io = req.app.get('io');
     if (io) {
+      joinUsersToConversation(io, conversationId, userIds);
       io.to(`conversation:${conversationId}`).emit('conversation:participant-added', {
         conversationId,
         participants: addedParticipants,
@@ -669,6 +681,9 @@ async function removeParticipant(req, res) {
         leftAt: new Date().toISOString(),
         isSelfRemoval,
       });
+
+      // Stop delivering this conversation's events to the removed user
+      removeUserFromConversation(io, conversationId, userId);
     }
 
     logger.info('Participant removed from conversation', {

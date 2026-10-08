@@ -246,7 +246,6 @@ class Conversation {
           json_build_object(
             'userId', u.id,
             'username', u.username,
-            'email', u.email,
             'avatarUrl', u.avatar_url
           )
         ) FILTER (WHERE u.id IS NOT NULL AND ($2::uuid IS NULL OR u.id != $2)) as participants
@@ -280,7 +279,6 @@ class Conversation {
           json_build_object(
             'userId', u.id,
             'username', u.username,
-            'email', u.email,
             'avatarUrl', u.avatar_url
           )
         ) FILTER (WHERE u.id IS NOT NULL AND u.id != $1) as participants
@@ -479,6 +477,22 @@ class Conversation {
     );
 
     return result.rows.map(row => row.user_id);
+  }
+
+  /**
+   * Get IDs of all conversations a user is currently part of
+   *
+   * @param {string} userId - User UUID
+   * @returns {Promise<string[]>} Array of conversation UUIDs
+   */
+  static async getConversationIdsForUser(userId) {
+    const result = await pool.query(
+      `SELECT conversation_id FROM conversation_participants
+       WHERE user_id = $1 AND left_at IS NULL`,
+      [userId]
+    );
+
+    return result.rows.map(row => row.conversation_id);
   }
 
   /**

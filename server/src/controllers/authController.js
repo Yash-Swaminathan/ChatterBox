@@ -3,6 +3,7 @@ const { hashPassword, comparePassword } = require('../utils/bcrypt');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const validator = require('validator');
 const logger = require('../utils/logger');
+const { createAutoConversationWithOwner } = require('../services/ownerService');
 
 // Register a new user
 // POST /api/auth/register
@@ -86,6 +87,10 @@ async function register(req, res) {
 
     // Commit transaction
     await client.query('COMMIT');
+
+    // Give the new user a conversation with the site owner (no-op unless OWNER_USER_ID is set).
+    // Awaited so it exists by the time the client loads its conversation list; it never throws.
+    await createAutoConversationWithOwner(user.id, req.app.get('io'));
 
     return res.status(201).json({
       success: true,
