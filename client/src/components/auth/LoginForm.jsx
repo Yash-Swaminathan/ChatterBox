@@ -103,6 +103,12 @@ export function LoginForm() {
       </Button>
 
       <p className="auth-footer">
+        <a href="/forgot-password" onClick={(e) => { e.preventDefault(); navigate('/forgot-password'); }}>
+          Forgot password?
+        </a>
+      </p>
+
+      <p className="auth-footer">
         Don't have an account?{' '}
         <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }}>
           Create one

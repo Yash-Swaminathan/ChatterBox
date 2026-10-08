@@ -39,7 +39,7 @@ class MessageCacheService {
 
       // Get from Redis sorted set (newest first)
       // ZREVRANGE returns members in reverse order (high to low score)
-      const cached = await redisClient.zRevRange(key, 0, limit - 1);
+      const cached = await redisClient.zRange(key, 0, limit - 1, { REV: true });
 
       if (!cached || cached.length === 0) {
         logger.debug('Cache miss - recent messages', { conversationId });

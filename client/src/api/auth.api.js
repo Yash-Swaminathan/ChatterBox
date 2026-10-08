@@ -22,6 +22,16 @@ export const authAPI = {
     return response.data.data;
   },
 
+  async forgotPassword(email) {
+    const response = await api.post(API_ENDPOINTS.FORGOT_PASSWORD, { email });
+    return response.data.data;
+  },
+
+  async resetPassword(token, password) {
+    const response = await api.post(API_ENDPOINTS.RESET_PASSWORD, { token, password });
+    return response.data.data;
+  },
+
   async getCurrentUser() {
     const response = await api.get(API_ENDPOINTS.ME);
     return response.data.data.user;

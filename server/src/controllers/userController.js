@@ -1,6 +1,8 @@
 // Note: Validation middleware already ensures at least one field is provided
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const { pool } = require('../config/database');
+const { verifyUnsubscribeToken } = require('../services/messageNotifications');
 const { getPaginationParams, createPaginationResponse } = require('../utils/pagination');
 const { uploadAvatar: uploadAvatarToStorage, deleteAvatar } = require('../services/uploadService');
 
@@ -637,7 +639,36 @@ async function updatePrivacySettings(req, res) {
   }
 }
 
+/**
+ * Turn off reply emails using the signed link from an email
+ * @route GET /api/users/unsubscribe?token=...
+ */
+async function unsubscribeFromEmails(req, res) {
+  const page = message =>
+    '<!doctype html><html><head><meta charset="utf-8"><title>ChatterBox</title></head>' +
+    '<body style="font-family:Arial,sans-serif;max-width:480px;margin:80px auto;text-align:center">' +
+    `<h1>ChatterBox</h1><p>${message}</p></body></html>`;
+
+  try {
+    const userId = verifyUnsubscribeToken(String(req.query.token || ''));
+
+    if (!userId) {
+      return res.status(400).send(page('This link is not valid.'));
+    }
+
+    await pool.query('UPDATE users SET email_notifications = false WHERE id = $1', [userId]);
+
+    logger.info('User unsubscribed from reply emails', { userId });
+
+    return res.status(200).send(page('You will no longer receive reply emails.'));
+  } catch (error) {
+    logger.error('Unsubscribe failed', { error: error.message });
+    return res.status(500).send(page('Something went wrong. Please try again later.'));
+  }
+}
+
 module.exports = {
+  unsubscribeFromEmails,
   getCurrentUser,
   updateCurrentUser,
   getUserProfile,

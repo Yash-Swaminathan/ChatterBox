@@ -2,7 +2,13 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const { validateRegistration, validateLogin } = require('../middleware/validation');
+const passwordResetController = require('../controllers/passwordResetController');
+const {
+  validateRegistration,
+  validateLogin,
+  validateForgotPassword,
+  validateResetPassword,
+} = require('../middleware/validation');
 const { requireAuth } = require('../middleware/auth');
 
 // Rate limiters for authentication endpoints (disabled in test environment)
@@ -38,7 +44,59 @@ const registerLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const passwordResetMessage = {
+  success: false,
+  error: {
+    code: 'TOO_MANY_REQUESTS',
+    message: 'Too many password reset attempts. Please try again later.',
+  },
+};
+
+// Limits how many reset emails one client can trigger
+const forgotPasswordIpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  skip: () => isTest,
+  message: passwordResetMessage,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Limits how many reset emails one address can receive, whoever asks
+const forgotPasswordEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  skip: () => isTest,
+  keyGenerator: req => `forgot:${String(req.body?.email || '').trim().toLowerCase()}`,
+  message: passwordResetMessage,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Limits guessing of reset tokens
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  skip: () => isTest,
+  message: passwordResetMessage,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 router.post('/register', registerLimiter, validateRegistration, authController.register);
+router.post(
+  '/forgot-password',
+  forgotPasswordIpLimiter,
+  validateForgotPassword,
+  forgotPasswordEmailLimiter,
+  passwordResetController.forgotPassword
+);
+router.post(
+  '/reset-password',
+  resetPasswordLimiter,
+  validateResetPassword,
+  passwordResetController.resetPassword
+);
 router.post('/login', loginLimiter, validateLogin, authController.login);
 router.post('/logout', requireAuth, authController.logout);
 router.post('/refresh', authController.refreshToken);

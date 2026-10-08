@@ -91,8 +91,11 @@ async function getConversationMessages(req, res) {
           success: true,
           data: {
             messages: cachedMessages,
-            nextCursor: null,
-            hasMore: false,
+            // The cache only holds the newest messages. A full page means there may be
+            // older ones, so hand back a cursor that continues from the database.
+            nextCursor:
+              cachedMessages.length >= limit ? cachedMessages[cachedMessages.length - 1].id : null,
+            hasMore: cachedMessages.length >= limit,
             cached: true,
           },
         });

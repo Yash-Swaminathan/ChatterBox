@@ -8,7 +8,7 @@ describe('Socket.io Integration Tests', () => {
   let serverSocket;
   let clientSocket;
 
-  const TEST_PORT = 3001; // Use different port to avoid conflicts
+  let TEST_PORT; // Assigned by the OS so the suite never collides with another process
 
   beforeAll(done => {
     // Create HTTP server
@@ -30,7 +30,8 @@ describe('Socket.io Integration Tests', () => {
     });
 
     // Start server
-    httpServer.listen(TEST_PORT, () => {
+    httpServer.listen(0, () => {
+      TEST_PORT = httpServer.address().port;
       done();
     });
   });

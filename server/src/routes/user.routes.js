@@ -124,6 +124,13 @@ router.put(
  * @access  Protected
  * @query   q (search query), limit (optional), offset (optional), excludeContacts (optional boolean)
  */
+/**
+ * @route   GET /api/users/unsubscribe
+ * @desc    Stop reply emails; opened from a link in the email, so no login
+ * @access  Public (signed token)
+ */
+router.get('/unsubscribe', profileViewLimiter, userController.unsubscribeFromEmails);
+
 router.get(
   '/search',
   requireAuth,
