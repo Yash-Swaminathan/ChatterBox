@@ -1,9 +1,25 @@
-export function ConversationItem({ conversation, active = false }) {
+import { formatConversationTime } from '../../utils/formatTime';
+
+export function ConversationItem({ conversation, active = false, unreadCount = 0, onSelect }) {
   const displayName = conversation.name || 'Unknown';
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect?.(conversation.id);
+    }
+  };
+
   return (
-    <div className={`conversation-item ${active ? 'active' : ''}`}>
-      <div className="conversation-avatar">
+    <div
+      className={`conversation-item ${active ? 'active' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-current={active ? 'true' : undefined}
+      onClick={() => onSelect?.(conversation.id)}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="conversation-avatar avatar">
         {conversation.avatarUrl ? (
           <img src={conversation.avatarUrl} alt={displayName} />
         ) : (
@@ -16,12 +32,12 @@ export function ConversationItem({ conversation, active = false }) {
       <div className="conversation-content">
         <div className="conversation-header">
           <h4>{displayName}</h4>
-          <span className="timestamp">{conversation.timestamp}</span>
+          <span className="timestamp">{formatConversationTime(conversation.lastActivityAt)}</span>
         </div>
         <div className="conversation-preview">
-          <p>{conversation.lastMessage}</p>
-          {conversation.unreadCount > 0 && (
-            <span className="unread-badge">{conversation.unreadCount}</span>
+          <p>{conversation.lastMessage || ''}</p>
+          {unreadCount > 0 && (
+            <span className="unread-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
           )}
         </div>
       </div>

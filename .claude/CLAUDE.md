@@ -2,11 +2,11 @@
 
 > A production-ready MVP messaging platform with real-time communication, contact management, and extensible architecture
 
-**Status**: Week 9 IN PROGRESS (auth pages written; chat UI and privacy lockdown underway) | Backend Complete with 720 tests (716 passing, 4 skipped) - 99.4% pass rate
+**Status**: Week 10 NEXT (Week 9 complete: working chat UI, live delivery, owner-only lockdown) | 750 server tests
 
 **Goal**: A portfolio visitor can open the site, message the owner, and the owner gets notified.
 
-**Critical path to the goal (~22 hours)**: Week 9 (chat UI + lockdown) → Week 10 (notifications + password reset) → Week 11 (polish + deploy). Week 12 and the backlog come after launch.
+**Critical path to the goal (~11 hours left)**: Week 10 (notifications + password reset) → Week 11 (polish + deploy). Week 12 and the backlog come after launch.
 
 ---
 
@@ -221,39 +221,44 @@
 
 ---
 
-### Week 9: Working Chat UI + Privacy Lockdown (7-8 hours) - IN PROGRESS
+### Week 9: Working Chat UI + Privacy Lockdown (7-8 hours) - COMPLETED
 
 **Day 1-2: React Setup & Authentication** - COMPLETED
 - [x] Create React app with Vite; react-router-dom, axios, socket.io-client
 - [x] Login/Register pages, AuthContext, Axios interceptor, protected routes
 
 **Day 3: Client fixes (0.5 hours)**
-- [ ] `AuthContext.jsx`: declare `logout` before `startTokenRefresh` (crash on first render)
-- [ ] `AuthContext.jsx`: save a rotated refresh token in init and interval paths
-- [ ] `SocketContext.jsx`: pass `auth` as a function reading the current access token
-- [ ] `SocketContext.jsx`: emit `heartbeat` every 25s (presence expires after 60s without it)
+- [x] `AuthContext.jsx`: declare `logout` before `startTokenRefresh` (crash on first render)
+- [x] `AuthContext.jsx`: save a rotated refresh token in init and interval paths
+- [x] `SocketContext.jsx`: pass `auth` as a function reading the current access token
+- [x] `SocketContext.jsx`: emit `heartbeat` every 25s (presence expires after 60s without it)
 
 **Day 4-5: Chat UI (3.5 hours)**
-- [ ] `conversations.api.js`, `messages.api.js`, `utils/normalize.js`
-- [ ] `ChatContext` + `useChat`: conversations, active conversation, messages, unread counts
-- [ ] Sidebar list from GET /api/conversations; selecting a conversation; auto-select when there is only one
-- [ ] History from GET /api/messages/conversations/:id (reverse newest-first, "Load earlier" button)
-- [ ] Optimistic send with tempId; handle `message:new`, `message:sent`, `message:error` with retry
-- [ ] Unread badges (GET /api/messages/unread + live), `message:read` on open
-- [ ] Reconnect: refetch and merge without dropping pending messages
-- [ ] Scroll to bottom on new message; visitor-appropriate empty states
+- [x] `conversations.api.js`, `messages.api.js`, `utils/normalize.js`
+- [x] `ChatContext` + `useChat`: conversations, active conversation, messages, unread counts
+- [x] Sidebar list from GET /api/conversations; selecting a conversation; auto-select when there is only one
+- [x] History from GET /api/messages/conversations/:id (reverse newest-first, "Load earlier" button)
+- [x] Optimistic send with tempId; handle `message:new`, `message:sent`, `message:error` with retry
+- [x] Unread badges (GET /api/messages/unread + live), `message:read` on open
+- [x] Reconnect: refetch and merge without dropping pending messages
+- [x] Scroll to bottom on new message; visitor-appropriate empty states
 
 **Day 6: Server - live delivery (1 hour)**
-- [ ] On socket connect, join the socket to all of the user's `conversation:{id}` rooms
-- [ ] When a conversation is created or a participant added, join that user's online sockets to the room
-- [ ] Emit `conversation:new` to participants' user rooms so sidebars update live
+- [x] On socket connect, join the socket to all of the user's `conversation:{id}` rooms
+- [x] When a conversation is created or a participant added, join that user's online sockets to the room
+- [x] Emit `conversation:new` to participants' user rooms so sidebars update live
 
 **Day 7: Server - owner-only lockdown, Phase A (2 hours)**
-- [ ] `OWNER_USER_ID` + `OWNER_ONLY_MODE` env vars (flag off = current behaviour, existing tests unchanged)
-- [ ] `ownerService.js`: `isOwner()`, `createAutoConversationWithOwner()`; hook into register (fire-and-forget, idempotent)
-- [ ] With flag on, for non-owners: user search refused; profile fetch only for self or owner; direct conversation and add-contact only with owner; group creation and add-participants refused
-- [ ] Remove `email` from participants in GET /api/conversations
-- [ ] Tests for flag-on paths
+- [x] `OWNER_USER_ID` + `OWNER_ONLY_MODE` env vars (flag off = current behaviour, existing tests unchanged)
+- [x] `ownerService.js`: `isOwner()`, `createAutoConversationWithOwner()`; hook into register (fire-and-forget, idempotent)
+- [x] With flag on, for non-owners: user search refused; profile fetch only for self or owner; direct conversation and add-contact only with owner; group creation and add-participants refused
+- [x] Remove `email` from participants in GET /api/conversations
+- [x] Tests for flag-on paths
+- [x] Registration also adds contact rows both ways with the owner (presence is only broadcast to contacts)
+
+**Bugs found and fixed while verifying against a running server** (hidden before because tests mock these)
+- [x] `User.findById` did not exist, so POST /api/conversations/direct and POST /api/contacts always returned 500
+- [x] The shared Redis client was never connected at startup, so presence, unread counts and the message cache silently did nothing
 
 **Milestone 8**: A visitor registers, lands in a chat with the owner, and both sides see messages live. Visitors cannot see or reach each other.
 
@@ -316,6 +321,10 @@ Visitor sends message → recipient is OWNER_USER_ID?
 - [ ] Make MinIO optional: `initializeBucket()` failure must not exit the server
 - [ ] Migrations: runner skips `*_rollback.sql`; resolve missing 003, 004, 014-016; verify a clean run on an empty database
 - [ ] Remove hardcoded credentials from anything production-facing
+- [ ] `messageCacheService` calls `redisClient.zRevRange`, which does not exist in node-redis v5: every cache read errors and falls back to the database. Switch to `zRange(..., { REV: true })` and test the cached path
+- [ ] Local dev database has no `contacts` table (the runner executed the rollback files); rebuild it once the runner is fixed
+- [ ] `socket.integration.spec.js` hardcodes port 3001 and fails when that port is in use; use an ephemeral port
+- [ ] Add a favicon (the browser's default request 404s)
 
 **Day 4-5: Deploy (2 hours)**
 - [ ] One Dockerfile (or Nixpacks) building client then running server

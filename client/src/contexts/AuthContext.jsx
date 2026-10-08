@@ -20,8 +20,11 @@ export function AuthProvider({ children }) {
 
         if (refreshToken) {
           // Try to refresh and get current user
-          const { accessToken } = await authAPI.refreshToken(refreshToken);
+          const { accessToken, refreshToken: rotatedToken } = await authAPI.refreshToken(refreshToken);
           setAccessToken(accessToken);
+          if (rotatedToken) {
+            storage.set(STORAGE_KEYS.REFRESH_TOKEN, rotatedToken);
+          }
 
           const userData = await authAPI.getCurrentUser();
           setUser(userData);
@@ -61,6 +64,30 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // Logout
+  const logout = useCallback(async () => {
+    try {
+      const refreshToken = storage.get(STORAGE_KEYS.REFRESH_TOKEN);
+
+      if (refreshToken) {
+        await authAPI.logout(refreshToken);
+      }
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      // Clear everything regardless of API call success
+      clearAccessToken();
+      storage.remove(STORAGE_KEYS.REFRESH_TOKEN);
+      storage.remove(STORAGE_KEYS.USER);
+      setUser(null);
+
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    }
+  }, []);
+
   // Auto-refresh token every 12 minutes (access token expires in 15 min)
   const startTokenRefresh = useCallback(() => {
     // Clear any existing interval
@@ -75,8 +102,12 @@ export function AuthProvider({ children }) {
           logout();
           return;
         }
-        const { accessToken } = await authAPI.refreshToken(currentRefreshToken);
+        const { accessToken, refreshToken: rotatedToken } =
+          await authAPI.refreshToken(currentRefreshToken);
         setAccessToken(accessToken);
+        if (rotatedToken) {
+          storage.set(STORAGE_KEYS.REFRESH_TOKEN, rotatedToken);
+        }
       } catch (err) {
         console.error('Failed to refresh token:', err);
         logout();
@@ -140,30 +171,6 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   }, [startTokenRefresh]);
-
-  // Logout
-  const logout = useCallback(async () => {
-    try {
-      const refreshToken = storage.get(STORAGE_KEYS.REFRESH_TOKEN);
-
-      if (refreshToken) {
-        await authAPI.logout(refreshToken);
-      }
-    } catch (err) {
-      console.error('Logout error:', err);
-    } finally {
-      // Clear everything regardless of API call success
-      clearAccessToken();
-      storage.remove(STORAGE_KEYS.REFRESH_TOKEN);
-      storage.remove(STORAGE_KEYS.USER);
-      setUser(null);
-
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
-    }
-  }, []);
 
   const value = {
     user,

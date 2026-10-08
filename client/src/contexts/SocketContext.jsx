@@ -6,6 +6,9 @@ import { API_BASE_URL } from '../utils/constants';
 
 export const SocketContext = createContext(null);
 
+// The server drops a user's presence after 60s without a heartbeat
+const HEARTBEAT_INTERVAL_MS = 25000;
+
 export function SocketProvider({ children }) {
   const { user, isAuthenticated } = useAuth();
   const [socket, setSocket] = useState(null);
@@ -24,9 +27,9 @@ export function SocketProvider({ children }) {
       }
 
       const newSocket = io(API_BASE_URL, {
-        auth: {
-          token,
-        },
+        // A function, so every reconnect sends the current token rather than the
+        // one from login, which expires after 15 minutes
+        auth: (cb) => cb({ token: getAccessToken() }),
         transports: ['websocket', 'polling'],
       });
 
@@ -56,6 +59,12 @@ export function SocketProvider({ children }) {
         setError(err.message || 'Socket error');
       });
 
+      newSocket.heartbeatTimer = setInterval(() => {
+        if (newSocket.connected) {
+          newSocket.emit('heartbeat');
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+
       socketRef.current = newSocket;
       setSocket(newSocket);
     }
@@ -63,6 +72,7 @@ export function SocketProvider({ children }) {
     // Cleanup on unmount or when dependencies change
     return () => {
       if (socketRef.current) {
+        clearInterval(socketRef.current.heartbeatTimer);
         socketRef.current.disconnect();
         socketRef.current = null;
         setSocket(null);

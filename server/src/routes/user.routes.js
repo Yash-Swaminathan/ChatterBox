@@ -5,6 +5,7 @@ const userController = require('../controllers/userController');
 const { requireAuth } = require('../middleware/auth');
 const { validateProfileUpdate, validateStatusUpdate, validateUserSearch } = require('../middleware/validation');
 const { uploadAvatar, handleUploadError, validateFileExists } = require('../middleware/upload');
+const { requireOwnerInOwnerOnlyMode, requireReachableTarget } = require('../middleware/ownerOnly');
 
 // Rate limiters for user endpoints (disabled in test environment)
 const isTest = process.env.NODE_ENV === 'test';
@@ -123,13 +124,26 @@ router.put(
  * @access  Protected
  * @query   q (search query), limit (optional), offset (optional), excludeContacts (optional boolean)
  */
-router.get('/search', requireAuth, profileViewLimiter, validateUserSearch, userController.searchUsers);
+router.get(
+  '/search',
+  requireAuth,
+  profileViewLimiter,
+  requireOwnerInOwnerOnlyMode,
+  validateUserSearch,
+  userController.searchUsers
+);
 
 /**
  * @route   GET /api/users/:userId
  * @desc    Get public user profile by ID
  * @access  Protected
  */
-router.get('/:userId', requireAuth, profileViewLimiter, userController.getUserProfile);
+router.get(
+  '/:userId',
+  requireAuth,
+  profileViewLimiter,
+  requireReachableTarget(req => req.params.userId),
+  userController.getUserProfile
+);
 
 module.exports = router;

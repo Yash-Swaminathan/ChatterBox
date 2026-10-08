@@ -8,6 +8,9 @@ export const API_ENDPOINTS = {
   LOGOUT: '/api/auth/logout',
   REFRESH: '/api/auth/refresh',
   ME: '/api/auth/me',
+  CONVERSATIONS: '/api/conversations',
+  CONVERSATION_MESSAGES: '/api/messages/conversations',
+  UNREAD: '/api/messages/unread',
 };
 
 // Error Codes (from backend)

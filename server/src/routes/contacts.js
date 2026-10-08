@@ -8,6 +8,7 @@ const {
   validateGetContacts,
   validateUUID,
 } = require('../middleware/validation');
+const { requireReachableTarget } = require('../middleware/ownerOnly');
 const rateLimit = require('express-rate-limit');
 
 // Set SKIP_RATE_LIMIT=true in test environment to bypass rate limiting
@@ -36,7 +37,13 @@ const listContactsLimiter = rateLimit({
 router.use(requireAuth);
 
 // POST /api/contacts - Add contact
-router.post('/', addContactLimiter, validateAddContact, contactController.addContact);
+router.post(
+  '/',
+  addContactLimiter,
+  validateAddContact,
+  requireReachableTarget(req => req.body.userId),
+  contactController.addContact
+);
 
 // GET /api/contacts - List contacts with pagination
 router.get('/', listContactsLimiter, validateGetContacts, contactController.listContacts);

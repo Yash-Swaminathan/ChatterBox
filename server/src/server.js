@@ -2,6 +2,7 @@ require('dotenv').config();
 const http = require('http');
 const app = require('./app');
 const { initializeBucket } = require('./config/storage');
+const { connectRedis } = require('./config/redis');
 const { initializeSocket } = require('./socket');
 const logger = require('./utils/logger');
 
@@ -13,6 +14,15 @@ async function startServer() {
     // Initialize MinIO bucket
     await initializeBucket();
     logger.info('MinIO initialized successfully');
+
+    // Connect the shared Redis client used for presence, message cache and unread counts.
+    // These degrade gracefully without Redis, so a failed connection is not fatal.
+    const redisConnected = await connectRedis();
+    if (redisConnected) {
+      logger.info('Redis client connected');
+    } else {
+      logger.warn('Redis client not connected: presence and caching are unavailable');
+    }
 
     // Create HTTP server from Express app
     const httpServer = http.createServer(app);

@@ -2,6 +2,8 @@ const logger = require('../../utils/logger');
 const presenceService = require('../../services/presenceService');
 const { sendInitialPresence, broadcastPresenceChange } = require('./presenceHandler');
 const User = require('../../models/User');
+const Conversation = require('../../models/Conversation');
+const { conversationRoom } = require('../conversationRooms');
 
 // TODO: Future - Implement connection rate limiting per IP
 // TODO: Future - Track connection metrics (duration, transport type)
@@ -32,6 +34,7 @@ const connectionMetrics = {
 function connectionHandler(io) {
   io.on('connection', socket => {
     handleConnection(socket);
+    joinConversationRooms(socket);
     setupEventHandlers(socket, io);
   });
 
@@ -109,6 +112,28 @@ async function handleConnection(socket) {
       to: transport.name,
     });
   });
+}
+
+/**
+ * Join every conversation room the user belongs to, so messages and other
+ * conversation events arrive without the client having to join each one
+ * @param {SocketIO.Socket} socket - Client socket instance
+ */
+async function joinConversationRooms(socket) {
+  const { userId } = socket.user;
+
+  try {
+    const conversationIds = await Conversation.getConversationIdsForUser(userId);
+    if (conversationIds.length > 0) {
+      socket.join(conversationIds.map(conversationRoom));
+    }
+  } catch (error) {
+    logger.error('Failed to join conversation rooms on connect', {
+      socketId: socket.id,
+      userId,
+      error: error.message,
+    });
+  }
 }
 
 /**
