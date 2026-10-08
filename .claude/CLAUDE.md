@@ -2,11 +2,11 @@
 
 > A production-ready MVP messaging platform with real-time communication, contact management, and extensible architecture
 
-**Status**: Week 11 NEXT (Weeks 9-10 complete: chat UI, live delivery, owner-only lockdown, notifications, password reset) | 805 server tests
+**Status**: Ready to deploy (Weeks 9-11 code complete). Remaining steps are the owner's: see `DEPLOY.md` | 805 server tests
 
 **Goal**: A portfolio visitor can open the site, message the owner, and the owner gets notified.
 
-**Critical path to the goal (~6 hours left)**: Week 11 (polish + deploy). Week 12 and the backlog come after launch.
+**Critical path to the goal (~1-2 hours left)**: follow `DEPLOY.md` (Railway project, env vars, owner account, ntfy + Resend, smoke test). Week 12 and the backlog come after launch.
 
 ---
 
@@ -306,34 +306,31 @@ Visitor sends message → recipient is OWNER_USER_ID?
 
 ---
 
-### Week 11: Polish & Deployment (6 hours) - PENDING
+### Week 11: Polish & Deployment (6 hours) - CODE COMPLETE; deployment itself is the owner's step
 
-**Day 1-2: Polish (2 hours)**
-- [ ] Online/offline indicator for the other participant (`presence:changed`, `presence:bulk`)
-- [ ] `lastMessage` in GET /api/conversations so sidebar previews survive a refresh
-- [ ] Loading and error states; mobile layout (sidebar/chat toggle)
-- [ ] Move refresh token from localStorage to httpOnly cookie (same origin after deploy makes this simple)
+**Day 1-2: Polish**
+- [x] Online/offline indicator for the other participant (`presence:changed`, `presence:bulk`)
+- [x] `lastMessage` in GET /api/conversations so sidebar previews survive a refresh
+- [x] Loading and error states; mobile layout (one pane at a time with a back button)
+- [ ] Move refresh token from localStorage to httpOnly cookie. Deferred: it changes the auth API (the token must leave the response body to be worth doing) and its tests; do it after launch
 
-**Day 3: Deploy prep (2 hours)**
-- [ ] Express serves `client/dist` with SPA fallback (single service, same origin; no Nginx)
-- [ ] `config/database.js`: `DATABASE_URL` + SSL, longer connect timeout, stop logging every query text
-- [ ] `app.set('trust proxy', 1)` so rate limits use the real client IP
-- [ ] Make MinIO optional: `initializeBucket()` failure must not exit the server
-- [x] Migrations: runner skips `*_rollback.sql`
-- [ ] Migrations: resolve missing 003, 004, 014-016 (the repo has no migration that adds `conversations.name/avatar_url/created_by`); verify a clean run on an empty database
-- [ ] Remove hardcoded credentials from anything production-facing
-- [x] `messageCacheService` called `redisClient.zRevRange`, which does not exist in node-redis v5; now `zRange(..., { REV: true })`, and a full cached page returns a cursor so older messages stay reachable
-- [x] Local dev database had no `contacts` table (the runner executed the rollback files); the missing migrations were re-applied by hand
-- [x] `socket.integration.spec.js` hardcoded port 3001; it now uses an ephemeral port
-- [x] Add a favicon
+**Day 3: Deploy prep**
+- [x] Express serves `client/dist` with SPA fallback in production (single service, same origin; no Nginx)
+- [x] `config/database.js`: `DATABASE_URL`, optional SSL (`DB_SSL=true`), 10s connect timeout, query text logged only with `LOG_SQL=true`
+- [x] `trust proxy` in production so rate limits use the real client IP
+- [x] Object storage is optional: the server starts without MinIO (avatar uploads disabled)
+- [x] Migrations: runner skips `*_rollback.sql`; migration 021 restores the group fields a lost migration used to add; a clean run on an empty database passes the full test suite
+- [x] Redis URL (which contains the password in production) is no longer logged
+- [x] Message cache read fixed; socket integration suite uses a free port; favicon added
+- [ ] `docker-compose.yml` and `config/storage.js` still carry default local credentials; they are development-only, but set real `MINIO_*` values if avatar uploads are enabled in production
 
-**Day 4-5: Deploy (2 hours)**
-- [ ] One Dockerfile (or Nixpacks) building client then running server
-- [ ] Railway.app: app service + Postgres plugin + Redis plugin (~$5/month); HTTPS is provided
-- [ ] Env vars: `NODE_ENV`, `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CLIENT_URL`, `APP_URL`, `OWNER_USER_ID`, `OWNER_ONLY_MODE=true`, `NTFY_TOPIC`, `RESEND_API_KEY`, `OWNER_EMAIL`, `EMAIL_FROM`
-- [ ] `npm run migrate` as release command
-- [ ] Register the owner account on the live site, set `OWNER_USER_ID`, redeploy
-- [ ] Smoke test from a phone in incognito: register, send a message, confirm push + email + reminder + visitor reply email + password reset
+**Day 4-5: Deploy**
+- [x] One `Dockerfile` building the client then running the server (migrations run on start); verified locally against an empty database
+- [x] `DEPLOY.md`: environment variables, Railway steps, smoke test
+- [ ] **Owner**: create the Railway project (app + Postgres + Redis), set the variables, generate the domain
+- [ ] **Owner**: register the owner account on the live site, set `OWNER_USER_ID`, redeploy
+- [ ] **Owner**: ntfy app + Resend account (`NTFY_TOPIC`, `RESEND_API_KEY`, `EMAIL_FROM`, `OWNER_EMAIL`)
+- [ ] **Owner**: smoke test from a phone in a private window: register, send a message, confirm push + email + reminder + visitor reply email + password reset
 
 **Milestone 10**: Live on the internet; the goal is met.
 

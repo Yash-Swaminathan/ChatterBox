@@ -3,6 +3,8 @@
 .chat-page {
   display: flex;
   height: 100vh;
+  /* Mobile browsers: the visible height, excluding the address bar */
+  height: 100dvh;
   overflow: hidden;
   background: #ffffff;
 }
@@ -251,6 +253,9 @@
 }
 
 .chat-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
   padding: var(--sp-lg);
   border-bottom: 2px solid #000;
   background: #fff;
@@ -488,16 +493,21 @@
 /* ==================== RESPONSIVE ==================== */
 
 @media (max-width: 768px) {
+  /* One pane at a time: the conversation list or the open chat */
   .sidebar {
-    position: absolute;
-    z-index: 100;
-    height: 100%;
-    transform: translateX(-100%);
-    transition: transform var(--transition);
+    width: 100%;
+    border-right: none;
   }
 
-  .sidebar.open {
-    transform: translateX(0);
+  .chat-page.pane-chat .sidebar,
+  .chat-page.pane-list .chat-window,
+  .chat-page.pane-list .chat-window-empty {
+    display: none;
+  }
+
+  /* More specific than the base rule further down, which hides it */
+  .chat-header .chat-back {
+    display: inline-flex;
   }
 
   .message {
@@ -510,10 +520,6 @@
 }
 
 @media (max-width: 640px) {
-  .sidebar {
-    width: 280px;
-  }
-
   .message {
     max-width: 90%;
   }
@@ -545,4 +551,51 @@
 
 .user-details .status.status-offline::before {
   background: var(--text-tertiary);
+}
+
+/* ==================== PRESENCE & MOBILE NAVIGATION ==================== */
+
+.chat-status-offline {
+  color: var(--text-tertiary);
+}
+
+.chat-status-offline::before {
+  background: var(--text-tertiary);
+}
+
+.conversation-avatar {
+  position: relative;
+  overflow: visible;
+}
+
+.conversation-avatar .avatar-placeholder,
+.conversation-avatar img {
+  border-radius: 50%;
+}
+
+.conversation-avatar.avatar-online::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--success);
+  border: 2px solid #fff;
+}
+
+/* Only shown on narrow screens (see the media query above) */
+.chat-back {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--text-lg);
+  cursor: pointer;
 }

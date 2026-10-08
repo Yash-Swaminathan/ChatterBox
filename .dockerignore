@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+.git
+.claude
+.history
+**/coverage
+server/tests
+server/test-results.json
+**/*.spec.js
+**/*.test.js
+**/__tests__
+**/__mocks__

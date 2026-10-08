@@ -19,7 +19,11 @@ export function ConversationItem({ conversation, active = false, unreadCount = 0
       onClick={() => onSelect?.(conversation.id)}
       onKeyDown={handleKeyDown}
     >
-      <div className="conversation-avatar avatar">
+      <div
+        className={`conversation-avatar avatar ${
+          conversation.status && conversation.status !== 'offline' ? 'avatar-online' : ''
+        }`}
+      >
         {conversation.avatarUrl ? (
           <img src={conversation.avatarUrl} alt={displayName} />
         ) : (

@@ -222,6 +222,9 @@ async function login(req, res) {
 
     await client.query('COMMIT');
 
+    // Covers accounts created before the owner was configured. Idempotent; never throws.
+    await createAutoConversationWithOwner(user.id, req.app.get('io'));
+
     return res.status(200).json({
       success: true,
       data: {

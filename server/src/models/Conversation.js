@@ -281,7 +281,18 @@ class Conversation {
             'username', u.username,
             'avatarUrl', u.avatar_url
           )
-        ) FILTER (WHERE u.id IS NOT NULL AND u.id != $1) as participants
+        ) FILTER (WHERE u.id IS NOT NULL AND u.id != $1) as participants,
+        (
+          SELECT json_build_object(
+            'content', m.content,
+            'senderId', m.sender_id,
+            'createdAt', m.created_at
+          )
+          FROM messages m
+          WHERE m.conversation_id = c.id AND m.deleted_at IS NULL
+          ORDER BY m.created_at DESC, m.id DESC
+          LIMIT 1
+        ) as "lastMessage"
       FROM conversations c
       INNER JOIN conversation_participants cp ON c.id = cp.conversation_id
       LEFT JOIN conversation_participants cp2 ON c.id = cp2.conversation_id AND cp2.user_id != $1

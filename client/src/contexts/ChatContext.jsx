@@ -20,6 +20,7 @@ const initialState = {
   activeId: null,
   messages: {}, // { [conversationId]: thread }
   unread: {}, // { [conversationId]: count }
+  mobilePane: 'list', // On narrow screens only one of 'list' | 'chat' is visible
   loading: true,
   error: null,
 };
@@ -96,7 +97,7 @@ function chatReducer(state, action) {
       const conversations = sortByLastActivity(
         action.conversations.map((c) => ({
           ...c,
-          lastMessage: previous.get(c.id)?.lastMessage ?? null,
+          lastMessage: c.lastMessage ?? previous.get(c.id)?.lastMessage ?? null,
         }))
       );
 
@@ -106,12 +107,23 @@ function chatReducer(state, action) {
         activeId = conversations.length === 1 ? conversations[0].id : null;
       }
 
+      // Someone with a single conversation goes straight to it; otherwise show the list first
+      const mobilePane = state.loading ? (activeId ? 'chat' : 'list') : state.mobilePane;
+
       const unread = { ...(action.unread || state.unread) };
       if (activeId) {
         unread[activeId] = 0;
       }
 
-      return { ...state, conversations, activeId, unread, loading: false, error: null };
+      return {
+        ...state,
+        conversations,
+        activeId,
+        unread,
+        mobilePane,
+        loading: false,
+        error: null,
+      };
     }
 
     case 'CONVERSATIONS_FAILED':
@@ -121,7 +133,30 @@ function chatReducer(state, action) {
       return {
         ...state,
         activeId: action.conversationId,
+        mobilePane: 'chat',
         unread: { ...state.unread, [action.conversationId]: 0 },
+      };
+
+    case 'LIST_SHOWN':
+      return { ...state, mobilePane: 'list' };
+
+    case 'PRESENCE_CHANGED':
+      return {
+        ...state,
+        conversations: state.conversations.map((c) =>
+          c.otherUser?.userId === action.userId ? { ...c, status: action.status } : c
+        ),
+      };
+
+    case 'PRESENCE_SYNCED':
+      // Sent on connect, and only covers contacts who are not offline. People missing
+      // from it keep the status from the conversation list, which is fetched on every connect.
+      return {
+        ...state,
+        conversations: state.conversations.map((c) => {
+          const presence = c.otherUser && action.presences[c.otherUser.userId];
+          return presence ? { ...c, status: presence.status } : c;
+        }),
       };
 
     case 'MESSAGES_LOADING': {
@@ -390,7 +425,17 @@ export function ChatProvider({ children }) {
       }
     };
 
+    const handlePresenceChanged = ({ userId: changedUserId, status }) => {
+      dispatch({ type: 'PRESENCE_CHANGED', userId: changedUserId, status });
+    };
+
+    const handlePresenceBulk = ({ presences }) => {
+      dispatch({ type: 'PRESENCE_SYNCED', presences: presences || {} });
+    };
+
     socket.on('message:new', handleNewMessage);
+    socket.on('presence:changed', handlePresenceChanged);
+    socket.on('presence:bulk', handlePresenceBulk);
     socket.on('message:sent', handleSent);
     socket.on('message:error', handleMessageError);
     socket.on('conversation:new', loadConversations);
@@ -398,6 +443,8 @@ export function ChatProvider({ children }) {
 
     return () => {
       socket.off('message:new', handleNewMessage);
+      socket.off('presence:changed', handlePresenceChanged);
+      socket.off('presence:bulk', handlePresenceBulk);
       socket.off('message:sent', handleSent);
       socket.off('message:error', handleMessageError);
       socket.off('conversation:new', loadConversations);
@@ -407,6 +454,10 @@ export function ChatProvider({ children }) {
 
   const selectConversation = useCallback((conversationId) => {
     dispatch({ type: 'CONVERSATION_SELECTED', conversationId });
+  }, []);
+
+  const showList = useCallback(() => {
+    dispatch({ type: 'LIST_SHOWN' });
   }, []);
 
   const deliver = useCallback(
@@ -487,10 +538,12 @@ export function ChatProvider({ children }) {
       activeConversation,
       activeThread: activeConversation ? getThread(state, activeConversation.id) : emptyThread,
       unread: state.unread,
+      mobilePane: state.mobilePane,
       loading: state.loading,
       error: state.error,
       connected,
       selectConversation,
+      showList,
       sendMessage,
       retryMessage,
       loadEarlier,
@@ -500,6 +553,7 @@ export function ChatProvider({ children }) {
     state,
     connected,
     selectConversation,
+    showList,
     sendMessage,
     retryMessage,
     loadEarlier,
