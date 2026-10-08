@@ -26,7 +26,8 @@ export function SocketProvider({ children }) {
         return;
       }
 
-      const newSocket = io(API_BASE_URL, {
+      // An empty URL means "this origin"
+      const newSocket = io(API_BASE_URL || undefined, {
         // A function, so every reconnect sends the current token rather than the
         // one from login, which expires after 15 minutes
         auth: (cb) => cb({ token: getAccessToken() }),

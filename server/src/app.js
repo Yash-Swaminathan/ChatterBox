@@ -1,4 +1,6 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 // TODO: Uncomment after implementing database tests
@@ -7,8 +9,26 @@ const helmet = require('helmet');
 
 const app = express();
 
+// Behind a hosting platform's proxy the client address is in X-Forwarded-For.
+// Without this every visitor shares one IP and one rate limit.
+if (process.env.TRUST_PROXY) {
+  app.set('trust proxy', Number(process.env.TRUST_PROXY));
+} else if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        // Avatars are served from object storage on another origin
+        'img-src': ["'self'", 'data:', 'https:'],
+      },
+    },
+  })
+);
 
 // allows frontend to connect
 app.use(
@@ -53,6 +73,31 @@ app.get('/api', (req, res) => {
     version: '1.0.0',
   });
 });
+
+// In production the same server also serves the built React app, so the site,
+// the API and the WebSocket share one origin
+const clientDist = process.env.CLIENT_DIST || path.join(__dirname, '../../client/dist');
+const serveClient =
+  (process.env.NODE_ENV === 'production' || process.env.SERVE_CLIENT === 'true') &&
+  fs.existsSync(path.join(clientDist, 'index.html'));
+
+if (serveClient) {
+  app.use(express.static(clientDist));
+
+  // Client-side routes (/chat, /login, ...) all load the app shell
+  app.use((req, res, next) => {
+    const isPageRequest =
+      req.method === 'GET' &&
+      !req.path.startsWith('/api') &&
+      !req.path.startsWith('/socket.io') &&
+      !path.extname(req.path);
+
+    if (!isPageRequest) {
+      return next();
+    }
+    return res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // error handler for 404
 app.use((req, res) => {

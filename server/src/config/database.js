@@ -1,16 +1,26 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+// Hosting platforms provide a single DATABASE_URL; local development uses the DB_* variables
+const connection = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME || 'chatterbox',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD,
+    };
+
 // PostgreSQL connection pool configuration
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'chatterbox',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD,
+  ...connection,
+  // Managed databases reached over the public internet require TLS, usually with a
+  // certificate that is not in Node's trust store
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   max: 20, // 20 clients in the pool
   idleTimeoutMillis: 30000, // 30 seconds
-  connectionTimeoutMillis: 2000, // 2 seconds
+  connectionTimeoutMillis: 10000, // 10 seconds
 });
 
 // Handle pool errors
@@ -38,8 +48,10 @@ const query = async (text, params) => {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    console.log('Executed query', { text, duration, rows: res.rowCount });
+    // Query text can contain personal data, so it is only logged on request
+    if (process.env.LOG_SQL === 'true') {
+      console.log('Executed query', { text, duration: Date.now() - start, rows: res.rowCount });
+    }
     return res;
   } catch (error) {
     console.error('Query error:', error.message);

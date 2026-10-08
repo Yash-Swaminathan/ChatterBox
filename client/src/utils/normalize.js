@@ -36,7 +36,7 @@ export function normalizeConversation(raw) {
     avatarUrl: raw.avatar_url ?? raw.avatarUrl ?? otherUser?.avatarUrl ?? null,
     otherUser,
     status: otherUser?.status ?? null,
-    lastMessage: null,
+    lastMessage: raw.lastMessage?.content ?? null,
     lastActivityAt: raw.updated_at ?? raw.updatedAt ?? raw.created_at ?? null,
   };
 }

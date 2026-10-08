@@ -1,5 +1,7 @@
 // API Base URL
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// A production build is served by the API server itself, so it talks to its own origin
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '');
 
 // API Endpoints
 export const API_ENDPOINTS = {

@@ -12,9 +12,15 @@ const PORT = process.env.PORT || 3000;
 // Initialize MinIO bucket before starting server
 async function startServer() {
   try {
-    // Initialize MinIO bucket
-    await initializeBucket();
-    logger.info('MinIO initialized successfully');
+    // Object storage only backs avatar uploads, so the app starts without it
+    try {
+      await initializeBucket();
+      logger.info('MinIO initialized successfully');
+    } catch (error) {
+      logger.warn('Object storage unavailable: avatar uploads are disabled', {
+        error: error.message,
+      });
+    }
 
     // Connect the shared Redis client used for presence, message cache and unread counts.
     // These degrade gracefully without Redis, so a failed connection is not fatal.

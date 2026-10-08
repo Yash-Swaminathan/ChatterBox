@@ -84,7 +84,7 @@ async function initializeRedisAdapter(io) {
       logger.warn('REDIS_URL not set, using default redis://localhost:6379');
     }
 
-    logger.info('Initializing Redis adapter', { redisUrl });
+    logger.info('Initializing Redis adapter');
 
     // Create Redis clients with connection pooling and retry strategy
     const redisConfig = {
@@ -147,7 +147,6 @@ async function initializeRedisAdapter(io) {
 
     logger.info('Redis adapter connected successfully', {
       adapterType: 'RedisAdapter',
-      redis: redisUrl,
     });
 
     // Graceful shutdown handler
