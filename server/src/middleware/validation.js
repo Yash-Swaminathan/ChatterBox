@@ -18,8 +18,12 @@ const SEARCH_LIMIT_MAX = 100;
  * Validate registration input
  */
 function validateRegistration(req, res, next) {
-  const { username, email, password } = req.body;
+  const { username, email, password, emailNotifications } = req.body;
   const errors = [];
+
+  if (emailNotifications !== undefined && typeof emailNotifications !== 'boolean') {
+    errors.push('emailNotifications must be true or false');
+  }
 
   // Username validation
   if (!username || username.trim().length === 0) {

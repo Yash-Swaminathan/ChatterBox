@@ -16,6 +16,7 @@ export function RegisterForm() {
     password: '',
     confirmPassword: '',
     displayName: '',
+    emailNotifications: true,
   });
 
   const [errors, setErrors] = useState({});
@@ -23,7 +24,8 @@ export function RegisterForm() {
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, type, checked } = e.target;
+    const value = type === 'checkbox' ? checked : e.target.value;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
     // Clear field error on change
@@ -140,6 +142,16 @@ export function RegisterForm() {
         required
         autoComplete="new-password"
       />
+
+      <label className="auth-checkbox">
+        <input
+          type="checkbox"
+          name="emailNotifications"
+          checked={formData.emailNotifications}
+          onChange={handleChange}
+        />
+        <span>Email me when I get a reply while I'm away</span>
+      </label>
 
       <Button type="submit" fullWidth loading={loading}>
         Create Account
