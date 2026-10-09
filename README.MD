@@ -4,7 +4,7 @@
 
 ## Live Demo
 
-**https://chatterbox-app-production-ab46.up.railway.app**
+**https://chat.yashswaminathan.com**
 
 Create an account and you land in a chat with me. Messages are delivered in real time, and you can choose at signup to get an email when I reply while you're away.
 
