@@ -2,6 +2,14 @@
 
 > **A production-ready MVP messaging platform with real-time communication, contact management, and extensible architecture**
 
+## Live Demo
+
+**https://chatterbox-app-production-ab46.up.railway.app**
+
+Create an account and you land in a chat with me. Messages are delivered in real time, and you can choose at signup to get an email when I reply while you're away.
+
+Deployment notes are in [`DEPLOY.md`](DEPLOY.md).
+
 ---
 
 ## Quick Start Commands
