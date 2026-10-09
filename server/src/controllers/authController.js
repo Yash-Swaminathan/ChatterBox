@@ -18,6 +18,8 @@ async function register(req, res) {
     const password = req.body.password || ''; // Don't trim passwords
     const displayName = req.body.displayName ? validator.trim(req.body.displayName) : username;
     const phoneNumber = req.body.phoneNumber ? validator.trim(req.body.phoneNumber) : null;
+    // Opt-out at signup: on unless the client explicitly sends false
+    const emailNotifications = req.body.emailNotifications !== false;
 
     // Start transaction
     await client.query('BEGIN');
@@ -45,8 +47,8 @@ async function register(req, res) {
 
     // Insert new user
     const insertUserQuery = `
-      INSERT INTO users (username, email, password_hash, display_name, phone_number)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO users (username, email, password_hash, display_name, phone_number, email_notifications)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, username, email, display_name, phone_number, created_at, status
     `;
     const userResult = await client.query(insertUserQuery, [
@@ -55,6 +57,7 @@ async function register(req, res) {
       passwordHash,
       displayName || username,
       phoneNumber || null,
+      emailNotifications,
     ]);
 
     const user = userResult.rows[0];

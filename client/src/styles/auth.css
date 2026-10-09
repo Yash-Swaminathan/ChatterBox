@@ -136,3 +136,18 @@
     transform: translateY(0);
   }
 }
+
+.auth-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-md);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.auth-checkbox input {
+  flex-shrink: 0;
+  margin: 0;
+}

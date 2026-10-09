@@ -167,6 +167,45 @@ describe('Authentication API', () => {
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
       expect(response.body.error.details.length).toBeGreaterThan(0);
     });
+
+    test('should turn email notifications on by default', async () => {
+      const result = await query('SELECT email_notifications FROM users WHERE email = $1', [
+        testUser.email,
+      ]);
+
+      expect(result.rows[0].email_notifications).toBe(true);
+    });
+
+    test('should store an email notification opt-out', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          username: 'optout_auth',
+          email: 'optoutauth@example.com',
+          password: 'TestPass123',
+          emailNotifications: false,
+        })
+        .expect(201);
+
+      const result = await query('SELECT email_notifications FROM users WHERE id = $1', [
+        response.body.data.user.id,
+      ]);
+      expect(result.rows[0].email_notifications).toBe(false);
+    });
+
+    test('should reject a non-boolean emailNotifications', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          username: 'optbad_auth',
+          email: 'optbadauth@example.com',
+          password: 'TestPass123',
+          emailNotifications: 'no',
+        })
+        .expect(400);
+
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
   });
 
   describe('POST /api/auth/login', () => {
