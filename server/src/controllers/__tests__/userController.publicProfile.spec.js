@@ -1,3 +1,11 @@
+const debugUtil = require('util');
+const debugEmit = process.emit;
+process.emit = function (name, ...args) {
+  if (name === 'uncaughtException' || name === 'unhandledRejection') {
+    console.error('DEBUGCI', name, debugUtil.inspect(args[0], { depth: 4 }), args[0] && args[0].stack);
+  }
+  return debugEmit.call(this, name, ...args);
+};
 const request = require('supertest');
 const app = require('../../app');
 const User = require('../../models/User');
