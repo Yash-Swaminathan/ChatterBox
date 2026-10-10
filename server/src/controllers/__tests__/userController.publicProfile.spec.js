@@ -55,8 +55,7 @@ describe('User Controller - Public Profile', () => {
         .get(`/api/users/${mockPublicUser.id}`)
         .set('Authorization', `Bearer ${authToken}`);
 
-      process.stderr.write('DEBUGCI ' + response.status + ' ' + JSON.stringify(response.body) + '
-');
+      console.error('DEBUGCI', response.status, JSON.stringify(response.body), new Date().toISOString());
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.user).toHaveProperty('id', mockPublicUser.id);
