@@ -69,7 +69,10 @@ jobs:
         run: npm run migrate
 
       - name: Run tests
-        run: npm test
+        run: |
+          npm test -- --json --outputFile=/tmp/r.json > /dev/null 2>&1 || true
+          node -e "const r=require('/tmp/r.json');for(const s of r.testResults){if(s.status!=='passed'){console.log('DEBUGSUITE',s.name,JSON.stringify(s.message));for(const a of s.assertionResults){if(a.status==='failed')console.log('DEBUGTEST',JSON.stringify(a,null,1))}}}"
+          exit 1
 
   client:
     name: Client build
