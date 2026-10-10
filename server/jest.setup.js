@@ -13,3 +13,12 @@ process.env.OWNER_USER_ID = '';
 process.env.OWNER_ONLY_MODE = '';
 process.env.NTFY_TOPIC = '';
 process.env.RESEND_API_KEY = '';
+
+const debugUtil = require('util');
+const debugEmit = process.emit;
+process.emit = function (name, ...args) {
+  if (name === 'uncaughtException' || name === 'unhandledRejection') {
+    process.stderr.write(`DEBUGCI ${name} ${debugUtil.inspect(args[0], { depth: 4 })} STACK ${args[0] && args[0].stack}\n`);
+  }
+  return debugEmit.call(this, name, ...args);
+};
