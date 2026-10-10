@@ -94,30 +94,27 @@ describe('Authentication Middleware', () => {
     });
 
     test('should return 401 with TOKEN_EXPIRED for expired token', () => {
-      // Create a token that expires immediately
+      // A token whose expiry is already in the past
       const jwt = require('jsonwebtoken');
       const expiredToken = jwt.sign(
         { userId: '123', email: 'test@example.com' },
         process.env.JWT_ACCESS_SECRET,
-        { expiresIn: '0s' }
+        { expiresIn: '-10s' }
       );
 
       req.headers.authorization = `Bearer ${expiredToken}`;
 
-      // Wait a moment to ensure token is expired
-      setTimeout(() => {
-        requireAuth(req, res, next);
+      requireAuth(req, res, next);
 
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith({
-          success: false,
-          error: {
-            code: 'TOKEN_EXPIRED',
-            message: 'Token has expired',
-          },
-        });
-        expect(next).not.toHaveBeenCalled();
-      }, 100);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'TOKEN_EXPIRED',
+          message: 'Token has expired',
+        },
+      });
+      expect(next).not.toHaveBeenCalled();
     });
 
     test('should return 401 when token has invalid signature', () => {

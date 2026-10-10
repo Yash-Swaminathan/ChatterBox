@@ -52,7 +52,11 @@ function verifyAccessToken(token) {
     return jwt.verify(token, ACCESS_TOKEN_SECRET);
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      throw new Error('Access token has expired');
+      // Keep the name: requireAuth uses it to answer TOKEN_EXPIRED, which is what
+      // tells the client to refresh the token and retry
+      const expired = new Error('Access token has expired');
+      expired.name = 'TokenExpiredError';
+      throw expired;
     }
     throw new Error('Invalid access token');
   }
