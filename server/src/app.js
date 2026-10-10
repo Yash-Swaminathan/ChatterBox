@@ -58,12 +58,14 @@ const userRoutes = require('./routes/user.routes');
 const conversationRoutes = require('./routes/conversations');
 const messageRoutes = require('./routes/messages');
 const contactRoutes = require('./routes/contacts');
+const contactRequestRoutes = require('./routes/contactRequests');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/contacts', contactRoutes);
+app.use('/api/contact-requests', contactRequestRoutes);
 
 // Temporary root API endpoint
 app.get('/api', (req, res) => {

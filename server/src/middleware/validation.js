@@ -629,6 +629,45 @@ function validateAddContact(req, res, next) {
 }
 
 /**
+ * Validate a connection request: an exact username, same rules as registration
+ */
+function validateSendContactRequest(req, res, next) {
+  const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+
+  if (username.length < 3 || username.length > 50 || !/^[a-zA-Z0-9_]+$/.test(username)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Enter a full username (3-50 letters, numbers or underscores)',
+      },
+    });
+  }
+
+  req.body.username = username;
+  next();
+}
+
+/**
+ * Validate the contact request list filter
+ */
+function validateListContactRequests(req, res, next) {
+  const { type } = req.query;
+
+  if (type !== undefined && !isOneOf(type, ['received', 'sent'])) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'type must be "received" or "sent"',
+      },
+    });
+  }
+
+  next();
+}
+
+/**
  * Validate update contact request
  */
 function validateUpdateContact(req, res, next) {
@@ -984,6 +1023,8 @@ module.exports = {
   validateAddContact,
   validateUpdateContact,
   validateGetContacts,
+  validateSendContactRequest,
+  validateListContactRequests,
   validateUserSearch,
   validateUUID,
   validateAddParticipants,

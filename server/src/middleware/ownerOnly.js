@@ -1,4 +1,4 @@
-const { isOwnerOnlyMode, isOwner, canReach } = require('../services/ownerService');
+const { isOwnerOnlyMode, isOwner, canReachAll } = require('../services/ownerService');
 const logger = require('../utils/logger');
 
 function forbidden(req, res, message) {
@@ -29,17 +29,23 @@ function requireOwnerInOwnerOnlyMode(req, res, next) {
 }
 
 /**
- * In owner-only mode, allow the request only if the target user is the requester
- * or the owner (or the requester is the owner).
+ * In owner-only mode, allow the request only if every target user is the requester,
+ * the owner or an accepted connection (or the requester is the owner).
  * Must run after requireAuth.
- * @param {Function} getTargetId - (req) => target user ID
+ * @param {Function} getTargetIds - (req) => target user ID, or an array of them
  */
-function requireReachableTarget(getTargetId) {
-  return (req, res, next) => {
-    if (!canReach(req.user.userId, getTargetId(req))) {
-      return forbidden(req, res, 'You can only contact the site owner');
+function requireReachableTarget(getTargetIds) {
+  return async (req, res, next) => {
+    try {
+      const targetIds = [].concat(getTargetIds(req) ?? []);
+
+      if (!(await canReachAll(req.user.userId, targetIds))) {
+        return forbidden(req, res, 'You can only contact the site owner and your connections');
+      }
+      return next();
+    } catch (error) {
+      return next(error);
     }
-    return next();
   };
 }
 

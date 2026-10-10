@@ -1,5 +1,7 @@
 const Conversation = require('../models/Conversation');
 const Contact = require('../models/Contact');
+const ContactRequest = require('../models/ContactRequest');
+const { isValidUUID } = require('../utils/validators');
 const logger = require('../utils/logger');
 const { joinUsersToConversation } = require('../socket/conversationRooms');
 
@@ -31,7 +33,8 @@ function isOwner(userId) {
 }
 
 /**
- * Check whether a user is allowed to see or contact another user
+ * Check whether a user is allowed to see or contact another user without a connection:
+ * themselves and the owner (and, for the owner, everyone)
  * @param {string} requesterId - User making the request
  * @param {string} targetId - User being viewed or contacted
  * @returns {boolean}
@@ -41,6 +44,27 @@ function canReach(requesterId, targetId) {
     return true;
   }
   return requesterId === targetId || isOwner(requesterId) || isOwner(targetId);
+}
+
+/**
+ * Check whether a user is allowed to see or contact every one of the given users.
+ * In owner-only mode that means the owner or an accepted connection.
+ * @param {string} requesterId - User making the request
+ * @param {string[]} targetIds - Users being viewed or contacted
+ * @returns {Promise<boolean>}
+ */
+async function canReachAll(requesterId, targetIds) {
+  const needConnection = targetIds.filter(targetId => !canReach(requesterId, targetId));
+
+  if (needConnection.length === 0) {
+    return true;
+  }
+  if (!needConnection.every(isValidUUID)) {
+    return false;
+  }
+
+  const connected = await ContactRequest.filterConnected(requesterId, needConnection);
+  return needConnection.every(targetId => connected.includes(targetId));
 }
 
 /**
@@ -89,5 +113,6 @@ module.exports = {
   isOwnerOnlyMode,
   isOwner,
   canReach,
+  canReachAll,
   createAutoConversationWithOwner,
 };

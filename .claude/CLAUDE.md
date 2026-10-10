@@ -2,7 +2,7 @@
 
 > A production-ready MVP messaging platform with real-time communication, contact management, and extensible architecture
 
-**Status**: Ready to deploy (Weeks 9-11 code complete). Remaining steps are the owner's: see `DEPLOY.md` | 805 server tests
+**Status**: Weeks 1-12 code complete; live at chat.yashswaminathan.com. Week 12 (connection requests) needs merging and deploying | 847 server tests
 
 **Goal**: A portfolio visitor can open the site, message the owner, and the owner gets notified.
 
@@ -336,16 +336,22 @@ Visitor sends message → recipient is OWNER_USER_ID?
 
 ---
 
-### Week 12: Connection Requests, Phase B (4 hours) - PENDING (after launch)
+### Week 12: Connection Requests, Phase B (4 hours) - COMPLETED
 
-- [ ] `contact_requests` table: sender_id, recipient_id, status (pending|accepted|rejected), created_at, responded_at; unique per pair
-- [ ] POST /api/contact-requests { username }: exact username only; same response whether or not the user exists; 10 per day; a rejected request cannot be re-sent for 30 days
-- [ ] GET /api/contact-requests?type=received|sent; PUT /api/contact-requests/:id/accept|reject
-- [ ] Accepting creates contact rows both ways and the direct conversation
-- [ ] Lockdown rule becomes "owner or accepted connection" for direct conversations, profiles and group membership
-- [ ] Socket events: `contact-request:received`, `contact-request:accepted`
-- [ ] Client: "Add by username" field and a requests inbox with accept/reject
-- [ ] Tests
+- [x] `contact_requests` table (migration 022): sender_id, recipient_id, status (pending|accepted|rejected), created_at, responded_at; unique per pair
+- [x] POST /api/contact-requests { username }: exact username only; same response whether or not the user exists; 10 per day; a rejected request cannot be re-sent for 30 days
+- [x] GET /api/contact-requests?type=received|sent; PUT /api/contact-requests/:id/accept|reject
+- [x] Accepting creates contact rows both ways and the direct conversation
+- [x] Lockdown rule is now "owner or accepted connection" for direct conversations, profiles and group membership (`canReachAll` in `ownerService.js`); user search stays owner-only
+- [x] Socket events: `contact-request:received`, `contact-request:accepted`
+- [x] Client: "Add by username" field and a requests inbox with accept/reject (`ConnectionRequests.jsx`, bottom of the sidebar)
+- [x] Tests (`contactRequestController.spec.js`, plus additions to the owner-only specs)
+
+Behaviour worth knowing:
+- If both people ask each other, the second request accepts the first.
+- The person who declined can ask the other way straight away; only the declined sender waits 30 days.
+- Requests to or from the owner, and between users where either has blocked the other, are silently dropped.
+- There is no "disconnect": blocking is how a connection is cut off.
 
 **Milestone 11**: Users can talk to each other, but only by mutual consent.
 
