@@ -1,9 +1,11 @@
 const Conversation = require('../../models/Conversation');
 const Contact = require('../../models/Contact');
+const ContactRequest = require('../../models/ContactRequest');
 const ownerService = require('../ownerService');
 
 jest.mock('../../models/Conversation');
 jest.mock('../../models/Contact');
+jest.mock('../../models/ContactRequest');
 jest.mock('../../utils/logger', () => ({
   info: jest.fn(),
   warn: jest.fn(),
@@ -77,6 +79,54 @@ describe('ownerService', () => {
 
       expect(ownerService.canReach(VISITOR_ID, OTHER_VISITOR_ID)).toBe(false);
       expect(ownerService.canReach(VISITOR_ID, VISITOR_ID)).toBe(true);
+    });
+  });
+
+  describe('canReachAll', () => {
+    beforeEach(() => {
+      process.env.OWNER_USER_ID = OWNER_ID;
+      process.env.OWNER_ONLY_MODE = 'true';
+      ContactRequest.filterConnected = jest.fn().mockResolvedValue([]);
+    });
+
+    it('should not query connections for the owner or the user themselves', async () => {
+      await expect(ownerService.canReachAll(VISITOR_ID, [OWNER_ID, VISITOR_ID])).resolves.toBe(
+        true
+      );
+      expect(ContactRequest.filterConnected).not.toHaveBeenCalled();
+    });
+
+    it('should refuse a visitor who is not connected', async () => {
+      await expect(ownerService.canReachAll(VISITOR_ID, [OTHER_VISITOR_ID])).resolves.toBe(false);
+      expect(ContactRequest.filterConnected).toHaveBeenCalledWith(VISITOR_ID, [OTHER_VISITOR_ID]);
+    });
+
+    it('should allow an accepted connection', async () => {
+      ContactRequest.filterConnected.mockResolvedValue([OTHER_VISITOR_ID]);
+
+      await expect(
+        ownerService.canReachAll(VISITOR_ID, [OWNER_ID, OTHER_VISITOR_ID])
+      ).resolves.toBe(true);
+    });
+
+    it('should refuse when any one target is not connected', async () => {
+      const stranger = '55555555-5555-4555-8555-555555555555';
+      ContactRequest.filterConnected.mockResolvedValue([OTHER_VISITOR_ID]);
+
+      await expect(
+        ownerService.canReachAll(VISITOR_ID, [OTHER_VISITOR_ID, stranger])
+      ).resolves.toBe(false);
+    });
+
+    it('should refuse a malformed ID without querying', async () => {
+      await expect(ownerService.canReachAll(VISITOR_ID, ['not-a-uuid'])).resolves.toBe(false);
+      expect(ContactRequest.filterConnected).not.toHaveBeenCalled();
+    });
+
+    it('should allow everything when owner-only mode is off', async () => {
+      delete process.env.OWNER_ONLY_MODE;
+
+      await expect(ownerService.canReachAll(VISITOR_ID, [OTHER_VISITOR_ID])).resolves.toBe(true);
     });
   });
 

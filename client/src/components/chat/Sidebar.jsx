@@ -1,6 +1,7 @@
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../hooks/useSocket';
 import { ConversationList } from './ConversationList';
+import { ConnectionRequests } from './ConnectionRequests';
 
 export function Sidebar() {
   const { user, logout } = useAuth();
@@ -32,6 +33,7 @@ export function Sidebar() {
       </div>
 
       <ConversationList />
+      <ConnectionRequests />
     </div>
   );
 }

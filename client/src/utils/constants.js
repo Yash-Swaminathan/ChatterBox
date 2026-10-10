@@ -15,6 +15,7 @@ export const API_ENDPOINTS = {
   CONVERSATIONS: '/api/conversations',
   CONVERSATION_MESSAGES: '/api/messages/conversations',
   UNREAD: '/api/messages/unread',
+  CONTACT_REQUESTS: '/api/contact-requests',
 };
 
 // Error Codes (from backend)

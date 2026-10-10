@@ -8,7 +8,7 @@ A real-time messaging app. Anyone who signs up lands in a live chat with me, and
 
 - **Real-time chat.** Messages are delivered over WebSockets, with optimistic sending, retry on failure, unread counts, and an online indicator.
 - **A conversation with the owner from the start.** Signing up creates a direct conversation with the site owner, so a visitor never sees an empty app.
-- **Private by default.** Visitors cannot search for, see, or message each other. Other users' email addresses are never returned by the API.
+- **Private by default.** Visitors cannot search for or browse each other. Two visitors can only talk after one sends a request to the other's exact username and it is accepted. Other users' email addresses are never returned by the API.
 - **Notifications both ways.** The owner gets an email (and optionally a phone push) when a visitor writes, plus a reminder if a message goes unanswered for 90 minutes. Visitors can choose at signup to get an email when the owner replies while they are away, and every email has an unsubscribe link.
 - **Accounts.** Registration, login, short-lived access tokens with rotating refresh tokens, and password reset by emailed single-use link.
 - **Works on a phone.** One pane at a time with a back button on small screens.
@@ -158,8 +158,9 @@ All routes are under `/api` and, apart from the auth routes, need an access toke
 | Conversations | `GET /conversations`, `POST /conversations/direct`, `POST /conversations/group`, participants and group settings |
 | Messages | `GET /messages/conversations/:id`, `GET /messages/unread`, `GET /messages/search`, `PUT/DELETE /messages/:id` |
 | Contacts | `GET/POST /contacts`, update, delete, block, unblock |
+| Connection requests | `POST /contact-requests` (exact username), `GET /contact-requests`, accept, reject |
 
-Real-time events (Socket.io): `message:send`, `message:new`, `message:sent`, `message:edit`, `message:delete`, `message:delivered`, `message:read`, `presence:update`, `presence:changed`, `conversation:new`, and `heartbeat`.
+Real-time events (Socket.io): `message:send`, `message:new`, `message:sent`, `message:edit`, `message:delete`, `message:delivered`, `message:read`, `presence:update`, `presence:changed`, `conversation:new`, `contact-request:received`, `contact-request:accepted`, and `heartbeat`.
 
 ## Deployment
 
@@ -167,7 +168,6 @@ The production image builds the client, serves it alongside the API, and applies
 
 ## What's next
 
-- Connection requests, so users can talk to each other by mutual consent
 - UI for group conversations, typing indicators and read receipts
 - Moving the refresh token to an httpOnly cookie
 
