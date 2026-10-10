@@ -55,14 +55,49 @@ describe('User Controller - Public Profile', () => {
         .get(`/api/users/${mockPublicUser.id}`)
         .set('Authorization', `Bearer ${authToken}`);
 
-      console.error('DEBUGCI', response.status, JSON.stringify(response.body), new Date().toISOString());
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.user).toHaveProperty('id', mockPublicUser.id);
-      expect(response.body.data.user).toHaveProperty('username');
-      expect(response.body.data.user).not.toHaveProperty('email');
-      expect(response.body.data.user).not.toHaveProperty('phone_number');
-      expect(User.getPublicUserById).toHaveBeenCalledWith(mockPublicUser.id);
+      const util = require('util');
+      try {
+        expect(response.status).toBe(200);
+      } catch (e) {
+        console.error('DEBUGCI step 0', util.inspect(e, { depth: 3 }), 'calls', JSON.stringify(User.getPublicUserById.mock && User.getPublicUserById.mock.calls));
+        throw e;
+      }
+      try {
+        expect(response.body.success).toBe(true);
+      } catch (e) {
+        console.error('DEBUGCI step 1', util.inspect(e, { depth: 3 }), 'calls', JSON.stringify(User.getPublicUserById.mock && User.getPublicUserById.mock.calls));
+        throw e;
+      }
+      try {
+        expect(response.body.data.user).toHaveProperty('id', mockPublicUser.id);
+      } catch (e) {
+        console.error('DEBUGCI step 2', util.inspect(e, { depth: 3 }), 'calls', JSON.stringify(User.getPublicUserById.mock && User.getPublicUserById.mock.calls));
+        throw e;
+      }
+      try {
+        expect(response.body.data.user).toHaveProperty('username');
+      } catch (e) {
+        console.error('DEBUGCI step 3', util.inspect(e, { depth: 3 }), 'calls', JSON.stringify(User.getPublicUserById.mock && User.getPublicUserById.mock.calls));
+        throw e;
+      }
+      try {
+        expect(response.body.data.user).not.toHaveProperty('email');
+      } catch (e) {
+        console.error('DEBUGCI step 4', util.inspect(e, { depth: 3 }), 'calls', JSON.stringify(User.getPublicUserById.mock && User.getPublicUserById.mock.calls));
+        throw e;
+      }
+      try {
+        expect(response.body.data.user).not.toHaveProperty('phone_number');
+      } catch (e) {
+        console.error('DEBUGCI step 5', util.inspect(e, { depth: 3 }), 'calls', JSON.stringify(User.getPublicUserById.mock && User.getPublicUserById.mock.calls));
+        throw e;
+      }
+      try {
+        expect(User.getPublicUserById).toHaveBeenCalledWith(mockPublicUser.id);
+      } catch (e) {
+        console.error('DEBUGCI step 6', util.inspect(e, { depth: 3 }), 'calls', JSON.stringify(User.getPublicUserById.mock && User.getPublicUserById.mock.calls));
+        throw e;
+      }
     });
 
     it('should return 400 if userId is invalid UUID format', async () => {
