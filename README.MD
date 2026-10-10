@@ -162,6 +162,10 @@ All routes are under `/api` and, apart from the auth routes, need an access toke
 
 Real-time events (Socket.io): `message:send`, `message:new`, `message:sent`, `message:edit`, `message:delete`, `message:delivered`, `message:read`, `presence:update`, `presence:changed`, `conversation:new`, `contact-request:received`, `contact-request:accepted`, and `heartbeat`.
 
+## Continuous integration
+
+Every pull request runs the database migrations and the full server test suite against PostgreSQL and Redis, and builds the client ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
 ## Deployment
 
 The production image builds the client, serves it alongside the API, and applies database migrations on start. See [`DEPLOY.md`](DEPLOY.md) for the environment variables, the Railway steps, and a smoke test.

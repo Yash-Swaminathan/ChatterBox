@@ -2,7 +2,7 @@
 
 > A production-ready MVP messaging platform with real-time communication, contact management, and extensible architecture
 
-**Status**: Weeks 1-12 code complete; live at chat.yashswaminathan.com. Week 12 (connection requests) needs merging and deploying | 847 server tests
+**Status**: Weeks 1-12 code complete; live at chat.yashswaminathan.com. CI (`.github/workflows/ci.yml`) runs migrations and the server tests against Postgres and Redis, and builds the client, on every PR | 847 server tests
 
 **Goal**: A portfolio visitor can open the site, message the owner, and the owner gets notified.
 
